@@ -1,0 +1,14 @@
+{
+  "name": "sundash",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "parcel sundash/web/index.html --dist-dir static",
+    "build": "parcel build sundash/web/index.html --dist-dir static --no-cache"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "parcel": "^2.9.3"
+  }
+}
