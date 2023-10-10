@@ -10,14 +10,41 @@ python = "^3.11"
 starlette = "^0.31.1"
 uvicorn = {extras = ["standard"], version = "^0.23.2"}
 loguru = "^0.7.2"
+orjson = "^3.9.7"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.16.1"
 ipdb = "^0.13.13"
 flake8 = "^6.1.0"
+flake8-pyproject = "^1.2.3"
 isort = "^5.12.0"
+black = "^23.9.1"
 poethepoet = "^0.24.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.flake8]
+max-complexity = 8
+max-line-length = 120
+
+[tool.black]
+target-version = ["py311"]
+line-length = 120
+
+[tool.isort]
+multi_line_output = 3
+line_length = 120
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+balanced_wrapping = true
+force_single_line = true
+profile = "black"
+
+[tool.poe.tasks]
+_isort = "isort --overwrite-in-place ."
+_black = "black ."
+_flake8 = "flake8p ."
+q = ["_isort", "_black", "_flake8"]  # q for quality :)

@@ -1,15 +1,15 @@
 from __future__ import annotations
-import enum
-from dataclasses import dataclass
+
 import datetime as dt
 from abc import ABC
+from dataclasses import dataclass
 from decimal import Decimal
-
 
 admin = ...
 
 
 # Case 1: используем для авто-генерации админки
+
 
 @dataclass
 class Schema(ABC):
@@ -17,7 +17,7 @@ class Schema(ABC):
         for field, tp in self.__annotations__.items():
             value = getattr(self, field)
             if not isinstance(value, tp):
-                raise ValueError(f'Wrong type of field `{field}`: {type(value)} (expected {tp})')
+                raise ValueError(f"Wrong type of field `{field}`: {type(value)} (expected {tp})")
 
 
 @dataclass
@@ -43,6 +43,7 @@ class Trade(Schema):
 class Widget(ABC):
     ...
 
+
 class SignalPanel(Widget):
     ...
 
@@ -62,7 +63,7 @@ Datepicker = ...
 
 @permissions_required(is_admin_360)
 class NineboxExporter(BaseForm):
-    htmx_name = 'ninebox_export'
+    htmx_name = "ninebox_export"
 
     class Widget(FormWidget):
         date_from = Datepicker()
@@ -72,6 +73,3 @@ class NineboxExporter(BaseForm):
         def validate_date_from(self, v: dt.date) -> True:
             first_ninebox = ...
             return first_ninebox <= v <= dt.today()
-
-
-# ----------------------------------------------
