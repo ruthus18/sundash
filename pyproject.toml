@@ -9,8 +9,8 @@ readme = "README.md"
 python = "^3.11"
 starlette = "^0.31.1"
 uvicorn = {extras = ["standard"], version = "^0.23.2"}
-loguru = "^0.7.2"
-orjson = "^3.9.7"
+simplejson = "^3.19.2"
+colorlog = "^6.7.0"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.16.1"
@@ -28,6 +28,9 @@ build-backend = "poetry.core.masonry.api"
 [tool.flake8]
 max-complexity = 8
 max-line-length = 120
+ignore = [
+    "E704"  # multiple statements on one line
+]
 
 [tool.black]
 target-version = ["py311"]

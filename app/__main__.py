@@ -19,5 +19,5 @@ class CurrentTime(Component):
         self.value = dt.time.now()
 
 
-sun_app.attach_to_layout(CurrentTime())
+# sun_app.attach_to_layout(CurrentTime())
 sun_app.run()

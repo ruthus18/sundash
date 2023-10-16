@@ -1,5 +1,6 @@
+from . import logging  # noqa # FIXME
+from .bus import Signal
 from .main import Component
-from .main import Signal
 from .main import Sundash
 from .main import Var
 

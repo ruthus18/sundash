@@ -1,6 +1,7 @@
 # Sundash
 
+*extensible realtime web UI client & server using Python & vanilla JS*
 
-Набрасываю демку с примерами
+Work in progress, making proto...
 
-Запуск: `python -m app`
+Launch: `python -m app`
