@@ -1,23 +1,20 @@
-import datetime as dt
+from sundash.core import App
+from sundash.core import run
 
-from sundash import Component
-from sundash import Signal as sig
-from sundash import Sundash
-from sundash import Var
-
-sun_app = Sundash()
+app = App()
 
 
-class CurrentTime(Component):
-    html = '<p style="padding: 30px">{{ value }}<p/>'
+# class CurrentTime(Component):
+#     html = '<p style="padding: 30px">{{ value }}<p/>'
 
-    # Каждый инстанс должен хранить эти переменные в памяти и восстанавливать
-    value: Var[dt.time] = None
+#     # Каждый инстанс должен хранить эти переменные в памяти и восстанавливать
+#     value: Var[dt.time] = None
 
-    @sun_app.on(sig.EVERY_SECOND)
-    def update(self):
-        self.value = dt.time.now()
+#     @app.on(sig.EVERY_SECOND)
+#     def update(self):
+#         self.value = dt.time.now()
 
 
-# sun_app.attach_to_layout(CurrentTime())
-sun_app.run()
+# app.attach_to_layout(CurrentTime())
+
+run(app)
