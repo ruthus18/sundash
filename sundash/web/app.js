@@ -20,9 +20,18 @@ socket.onmessage = event => {
 
     let [name, ...data] = event.data.split(" ")
     data = data.join(" ")
+    if (data != undefined) {
+        data = JSON.parse(data)
+    }
 
     if (name == Command.clear_layout) {
         clear_layout()
+    }
+    else if (name == Command.append_component) {
+        append_component(data)
+    }
+    else if (name == Command.update_var) {
+        update_var(data)
     }
     else {
         console.error(`dispatching error: ${event.data}`)
@@ -45,6 +54,21 @@ socket.onerror = error => {
 }
 
 
-function clear_layout(data) {
-    console.log(`need to clear layout: ${data}`)
+const el = document.getElementById("app")
+
+
+function clear_layout() {
+    el.innerHTML = ""
+    socket.send('LAYOUT_CLEAN {}')
+}
+
+
+function append_component(data) {
+    el.innerHTML += data.html
+    socket.send('LAYOUT_UPDATED {}')
+}
+
+
+function update_var(data) {
+    
 }

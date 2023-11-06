@@ -18,9 +18,9 @@ log_config = {
             "class": "logging.StreamHandler",
             "formatter": "default",
         },
-        'null': {
-            'level': 'DEBUG',
-            'class': 'logging.NullHandler',
+        "null": {
+            "level": "DEBUG",
+            "class": "logging.NullHandler",
         },
     },
     "loggers": {
@@ -28,9 +28,13 @@ log_config = {
             "handlers": ["stdout"],
             "level": logging.DEBUG,
         },
-        "uvicorn": {
-            'handlers': ['null'],
-            'propagate': False,
+        "uvicorn": {  # FIXME
+            "handlers": ["null"],
+            "propagate": False,
+        },
+        "asyncio": {  # FIXME
+            "handlers": ["null"],
+            "propagate": False,
         },
     },
 }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import json
 import logging
 import subprocess
 import typing as t
@@ -18,6 +19,8 @@ from starlette.websockets import WebSocketDisconnect
 
 from .bus import CLIENT_CONNECTED
 from .bus import CLIENT_DISCONNECTED
+from .bus import CMD_CALL
+from .bus import LAYOUT_CLEAN
 from .bus import SERVER_SHUTDOWN
 from .bus import SERVER_STARTUP
 from .bus import Signal
@@ -25,6 +28,7 @@ from .bus import SignalData
 from .bus import SignalHandler
 from .bus import add_handler
 from .bus import emit_signal
+from .bus import listener_task
 from .logging import log_config
 
 logger = logging.getLogger(__name__)
@@ -37,13 +41,19 @@ class Var(t.Generic[_V]):
 
 
 class Component:
-    ...
+    html: str = ''
 
 
 class App:
     def __init__(self):
         self.server = AppServer()
         self.layout: list = []
+
+        self._init_default_handlers()
+
+    def _init_default_handlers(self) -> None:
+        add_handler(CLIENT_CONNECTED, self._on_client_connected)
+        add_handler(LAYOUT_CLEAN, self._on_layout_clean)
 
     def on(self, signal: Signal) -> t.Awaitable:
         def wrapper(f: SignalHandler):
@@ -58,10 +68,14 @@ class App:
         return wrapper
 
     def attach_to_layout(self, component: Component) -> None:
-        logger.info(f"attached to layout: {component.__class__.__name__}")
+        self.layout.append(component)
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        await self.server(scope, receive, send)
+    async def _on_client_connected(self, data: dict) -> None:
+        await emit_signal(CMD_CALL, {'command': 'clear_layout'})
+
+    async def _on_layout_clean(self, data: dict) -> None:
+        for component in self.layout:
+            await emit_signal(CMD_CALL, {'command': 'append_component', 'params': {'html': component.html}})
 
 
 class AppServer:
@@ -74,6 +88,14 @@ class AppServer:
     _EXIT_CODE = 1
 
     ALLOWED_STATIC_FILES = (".html", "css", ".js", ".map", ".ico")
+
+    def __init__(self):
+        add_handler(CMD_CALL, self.call_command)
+
+    async def run(self, **config_params: dict) -> None:
+        config = uvicorn.Config(app=self, **config_params)
+        server = uvicorn.Server(config=config)
+        await server.serve()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
@@ -123,6 +145,7 @@ class AppServer:
 
     async def handle_websocket_request(self, scope: Scope, receive: Receive, send: Send) -> None:
         socket = WebSocket(scope=scope, receive=receive, send=send)
+        self._s = socket  # FIXME: client sessions
         await socket.accept()
 
         data = await socket.receive_text()
@@ -140,9 +163,11 @@ class AppServer:
         try:
             while True:
                 message = await socket.receive_text()  # noqa
-                # TODO
+                signal, data = message.split(" ", 1)
 
-        except asyncio.CancelledError:
+                await emit_signal(signal=signal, data=json.loads(data))
+
+        except asyncio.CancelledError:  # FIXME deprecated
             pass
 
         except WebSocketDisconnect as exc:
@@ -152,12 +177,24 @@ class AppServer:
         finally:
             logger.debug(f"shutdown lifetime task, host={socket.client.host}")
 
+    async def call_command(self, data):
+        command, params = data['command'], data.get('params', {})
+        await self._s.send_text(f'{command} {json.dumps(params)}')
 
-# TODO access event loop to run bus listener
-# https://github.com/encode/uvicorn/issues/706
+
 def run(app: App, *, host: str = "localhost", port: int = 5000) -> None:
     logger.info("Building web UI...")
-    subprocess.run(["npm", "run", "build"])  # FIXME control outputa and redirect to logger
+    subprocess.run(["npm", "run", "build"])  # FIXME control output and redirect to logger
 
     logger.info(f"Starting server at http://{host}:{port}/")
-    uvicorn.run(app, host=host, port=port, log_level="debug", log_config=log_config)
+    server_task = app.server.run(host=host, port=port, log_level="debug", log_config=log_config)
+    bus_listener_task = listener_task()
+
+    asyncio.run(_run(server_task, bus_listener_task))
+
+
+async def _run(*tasks: t.Iterable[t.Awaitable]) -> None:
+    await asyncio.wait(
+        [asyncio.create_task(t) for t in tasks],
+        return_when=asyncio.FIRST_COMPLETED,
+    )
