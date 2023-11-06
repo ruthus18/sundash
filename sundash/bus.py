@@ -36,6 +36,8 @@ def add_handler(signal: Signal, handler: SignalHandler) -> None:
 
 
 async def listener_task():
+    asyncio.create_task(on_tick())
+
     while True:
         signal, data = await _messages.get()
         logger.info(f'{signal}  {data}')
@@ -45,3 +47,13 @@ async def listener_task():
 
         for handler in _handlers[signal]:
             await handler(data)
+
+
+async def on_tick():
+    while True:
+        await asyncio.sleep(1)
+        if EVERY_SECOND not in _handlers:
+            continue
+
+        for handler in _handlers[EVERY_SECOND]:
+            await handler({})

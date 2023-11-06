@@ -9,17 +9,18 @@ from sundash.core import run
 app = App()
 
 
-class CurrentTime(Component):
-    html = '<p style="padding: 30px">{{ value }}<p/>'
+class Clock(Component):
+    html = '<p><b>Time: </b> {{ time }}<p/>'
 
-    # Каждый инстанс должен хранить эти переменные в памяти и восстанавливать
-    value: Var[dt.time] = None
+    time: Var[str]
 
     @app.on(EVERY_SECOND)
-    def update(self):
-        self.value = dt.time.now()
+    async def update(self, _):
+        now = dt.datetime.now().strftime('%H:%M:%S')
+        await self.set('time', now)
 
 
-app.attach_to_layout(CurrentTime())
+app.attach_to_layout('<h1>Clock Test</h1>')
+app.attach_to_layout(Clock())
 
 run(app)

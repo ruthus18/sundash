@@ -66,9 +66,12 @@ function clear_layout() {
 function append_component(data) {
     el.innerHTML += data.html
     socket.send('LAYOUT_UPDATED {}')
+
+    el._orig_html = el.innerHTML
 }
 
 
 function update_var(data) {
-    
+    el.innerHTML = el._orig_html.replace(`{{ ${data.name} }}`, data.value)
+    socket.send('VAR_UPDATED {}')
 }

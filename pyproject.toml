@@ -29,7 +29,8 @@ max-complexity = 8
 max-line-length = 120
 ignore = [
     "E704",  # multiple statements on one line
-    "E203",   # whitespace before ':'
+    "E203",  # whitespace before ':'
+    "E731",  # do not assign a lambda expression, use a def
 ]
 
 [tool.black]

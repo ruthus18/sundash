@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import collections
 import functools
 import json
 import logging
@@ -43,11 +44,19 @@ class Var(t.Generic[_V]):
 class Component:
     html: str = ''
 
+    async def set(self, name, value):
+        if type_annotation := self.__annotations__.get(name):
+            if type_annotation.__origin__ is Var:
+                await emit_signal(CMD_CALL, {'command': 'update_var', 'params': {'name': name, 'value': str(value)}})
+
+        setattr(self, name, value)
+
 
 class App:
     def __init__(self):
         self.server = AppServer()
         self.layout: list = []
+        self.layout_handlers = collections.defaultdict(set)
 
         self._init_default_handlers()
 
@@ -61,13 +70,31 @@ class App:
             async def handler_f(data: SignalData):
                 return await f(data)
 
-            add_handler(signal, handler_f)
+            @functools.wraps(f)
+            async def component_handler_f(self: Component, data: SignalData):
+                return await f(self, data)
 
-            return handler_f
+            is_component_handler = False
+            path = f.__qualname__.split('.')
+            if len(path) > 1:
+                is_component_handler = True
+
+            if is_component_handler:
+                component_name, handler_name = path[-2:]
+                self.layout_handlers[component_name].add((signal, handler_name))
+                return component_handler_f
+            else:
+                add_handler(signal, handler_f)
+                return handler_f
 
         return wrapper
 
-    def attach_to_layout(self, component: Component) -> None:
+    def attach_to_layout(self, component: Component | str) -> None:
+        if type(component) is str:
+            component_obj = Component()
+            component_obj.html = component
+            component = component_obj
+
         self.layout.append(component)
 
     async def _on_client_connected(self, data: dict) -> None:
@@ -76,6 +103,12 @@ class App:
     async def _on_layout_clean(self, data: dict) -> None:
         for component in self.layout:
             await emit_signal(CMD_CALL, {'command': 'append_component', 'params': {'html': component.html}})
+
+            component_name = component.__class__.__name__
+            if component_name in self.layout_handlers:
+                for signal, handler_name in self.layout_handlers[component_name]:
+                    handler = getattr(component, handler_name)
+                    add_handler(signal, handler)
 
 
 class AppServer:
@@ -156,10 +189,6 @@ class AppServer:
         await socket.send_text('LOGIN OK')
         await emit_signal(CLIENT_CONNECTED)
 
-        await self.client_lifetime_task(socket)
-
-    async def client_lifetime_task(self, socket: WebSocket) -> None:
-        logger.debug(f'startup lifetime task, host={socket.client.host}')
         try:
             while True:
                 message = await socket.receive_text()  # noqa
@@ -167,15 +196,9 @@ class AppServer:
 
                 await emit_signal(signal=signal, data=json.loads(data))
 
-        except asyncio.CancelledError:  # FIXME deprecated
-            pass
-
         except WebSocketDisconnect as exc:
             await emit_signal(CLIENT_DISCONNECTED, {'code': exc.code, 'reason': exc.reason})
             # raise
-
-        finally:
-            logger.debug(f"shutdown lifetime task, host={socket.client.host}")
 
     async def call_command(self, data):
         command, params = data['command'], data.get('params', {})
