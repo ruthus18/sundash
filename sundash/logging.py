@@ -18,11 +18,19 @@ log_config = {
             "class": "logging.StreamHandler",
             "formatter": "default",
         },
+        'null': {
+            'level': 'DEBUG',
+            'class': 'logging.NullHandler',
+        },
     },
     "loggers": {
         "": {
             "handlers": ["stdout"],
             "level": logging.DEBUG,
+        },
+        "uvicorn": {
+            'handlers': ['null'],
+            'propagate': False,
         },
     },
 }

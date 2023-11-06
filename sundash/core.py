@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 import logging
 import subprocess
@@ -12,11 +13,18 @@ from starlette.staticfiles import StaticFiles
 from starlette.types import Receive
 from starlette.types import Scope
 from starlette.types import Send
+from starlette.websockets import WebSocket
+from starlette.websockets import WebSocketDisconnect
 
-from .bus import BusManager
-from .bus import Command
+from .bus import CLIENT_CONNECTED
+from .bus import CLIENT_DISCONNECTED
+from .bus import SERVER_SHUTDOWN
+from .bus import SERVER_STARTUP
 from .bus import Signal
 from .bus import SignalData
+from .bus import SignalHandler
+from .bus import add_handler
+from .bus import emit_signal
 from .logging import log_config
 
 logger = logging.getLogger(__name__)
@@ -24,8 +32,8 @@ logger = logging.getLogger(__name__)
 _V = t.TypeVar("_V")
 
 
-# class Var(t.Generic[_V]):
-#     ...  # data bridge type between front and back
+class Var(t.Generic[_V]):
+    ...  # data bridge type between front and back
 
 
 class Component:
@@ -34,66 +42,23 @@ class Component:
 
 class App:
     def __init__(self):
+        self.server = AppServer()
         self.layout: list = []
 
-        self.server = AppServer(self)
-        self.bus = BusManager()
-
-        self._init_default_signal_handlers()
-
-    async def on_startup(self):
-        pass  # Add your startup logic
-
-    async def on_shutdown(self):
-        pass  # Add your shutdown logic
-
-    async def _on_client_connected(self, data: SignalData) -> None:
-        self.emit_signal()
-
-    async def _on_client_disconnected(self, data: SignalData) -> None:
-        ...
-
-    async def _on_layout_clean(self, data: SignalData) -> None:
-        ...
-
-    async def _on_layout_updated(self, data: SignalData) -> None:
-        ...
-
-    async def _on_every_second(self, data: SignalData) -> None:
-        ...
-
-    async def _on_var_updated(self, data: SignalData) -> None:
-        ...
-
-    def _init_default_signal_handlers(self) -> None:
-        self.on(Signal.CLIENT_CONNECTED)(self._on_client_connected)
-        self.on(Signal.CLIENT_DISCONNECTED)(self._on_client_disconnected)
-        self.on(Signal.LAYOUT_CLEAN)(self._on_layout_clean)
-        self.on(Signal.LAYOUT_UPDATED)(self._on_layout_updated)
-        self.on(Signal.EVERY_SECOND)(self._on_every_second)
-        self.on(Signal.VAR_UPDATED)(self._on_var_updated)
-
     def on(self, signal: Signal) -> t.Awaitable:
-        def wrapper(f: t.Awaitable):
+        def wrapper(f: SignalHandler):
             @functools.wraps(f)
-            async def handler_f(signal_data: SignalData):
-                logger.info(f"signal emitted: {signal}, data={signal_data}")
-                return await f(signal_data)
+            async def handler_f(data: SignalData):
+                return await f(data)
 
-            self.bus.add_handler(signal, handler_f)
+            add_handler(signal, handler_f)
 
             return handler_f
 
         return wrapper
 
-    def emit_signal(self, signal: Signal) -> None:
-        ...
-
-    def call_command(self, command: Command) -> None:
-        ...
-
-    def attach_to_page(self, component: Component) -> None:
-        ...
+    def attach_to_layout(self, component: Component) -> None:
+        logger.info(f"attached to layout: {component.__class__.__name__}")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         await self.server(scope, receive, send)
@@ -110,19 +75,32 @@ class AppServer:
 
     ALLOWED_STATIC_FILES = (".html", "css", ".js", ".map", ".ico")
 
-    def __init__(self, app: App):
-        self.app = app  # FIXME: Should be connected to bus and emit events to app
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "lifespan":
+            exit_code = await self.handle_lifespan(scope, receive, send)
+            if exit_code:
+                return
+
+        elif scope["type"] == "http":
+            await self.handle_http_request(scope, receive, send)
+
+        elif scope["type"] == "websocket":
+            await self.handle_websocket_request(scope, receive, send)
+
+        else:
+            response = HTMLResponse(content="<b>Not allowed</b>", status_code=405)
+            await response(scope, receive, send)
 
     async def handle_lifespan(self, scope: Scope, receive: Receive, send: Send) -> _EXIT_CODE | None:
         message = await receive()
         if message["type"] == "lifespan.startup":
-            await self.app.on_startup()
+            await emit_signal(SERVER_STARTUP)
 
             await send({"type": "lifespan.startup.complete"})
             return None
 
         elif message["type"] == "lifespan.shutdown":
-            await self.app.on_shutdown()
+            await emit_signal(SERVER_SHUTDOWN)
 
             await send({"type": "lifespan.shutdown.complete"})
             return self._EXIT_CODE
@@ -144,86 +122,39 @@ class AppServer:
                 await response(scope, receive, send)
 
     async def handle_websocket_request(self, scope: Scope, receive: Receive, send: Send) -> None:
-        ...  # TODO
+        socket = WebSocket(scope=scope, receive=receive, send=send)
+        await socket.accept()
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "lifespan":
-            exit_code = await self.handle_lifespan(scope, receive, send)
-            if exit_code:
-                return
+        data = await socket.receive_text()
+        if data != 'LOGIN':
+            await socket.close(code=1008)
+            return
 
-        elif scope["type"] == "http":
-            await self.handle_http_request(scope, receive, send)
+        await socket.send_text('LOGIN OK')
+        await emit_signal(CLIENT_CONNECTED)
 
-        elif scope["type"] == "websocket":
-            await self.handle_websocket_request(scope, receive, send)
+        await self.client_lifetime_task(socket)
 
-        else:
-            response = HTMLResponse(content="<b>Not allowed</b>", status_code=405)
-            await response(scope, receive, send)
+    async def client_lifetime_task(self, socket: WebSocket) -> None:
+        logger.debug(f'startup lifetime task, host={socket.client.host}')
+        try:
+            while True:
+                message = await socket.receive_text()  # noqa
+                # TODO
 
+        except asyncio.CancelledError:
+            pass
 
-# [UNDER CONSTRUCTION]
-# websockets draft logic -> upgrade and embed to `AppServer`
-# //-----//-----//-----//-----//-----//-----//-----//-----//-----
+        except WebSocketDisconnect as exc:
+            await emit_signal(CLIENT_DISCONNECTED, {'code': exc.code, 'reason': exc.reason})
+            # raise
 
-
-# TODO: Update ws endpoint code
-# async def _ws_endpoint(socket: WebSocket) -> None:
-#     await socket.accept()
-#     logger.info(f"connection opened: {socket.client.host}")
-
-#     await socket.send_text("OK")
-
-#     # FIXME: KeyboardInterrput
-#     listener_task = asyncio.create_task(_listener(socket))
-
-#     await asyncio.sleep(3)
-
-#     # Пример, когда мы не просто засыпаем, а отсылаем что-то клиенту
-#     # await _pusher(socket, 'PING')
-
-#     listener_task.cancel()
-#     try:
-#         await listener_task
-#     except WebSocketDisconnect:
-#         pass
-#     else:
-#         await socket.close(reason="thats all folks...")
-
-#     logger.info(f"connection closed: {socket.client.host}")
+        finally:
+            logger.debug(f"shutdown lifetime task, host={socket.client.host}")
 
 
-# async def _pusher(socket: WebSocket, push_text: str) -> None:
-#     for i in range(1, 6):
-#         await asyncio.sleep(1)
-
-#         text = ' '.join([push_text, str(i)])
-#         await socket.send_text(text)
-#         logger.info(f'message sent: {text}')
-
-
-# async def _listener(socket: WebSocket) -> None:
-#     logger.info("listener connected")
-#     try:
-#         while True:
-#             request_raw = await socket.receive_text()
-#             # await _bus.handle_request(request_raw)
-
-#     except asyncio.CancelledError:
-#         pass
-
-#     except WebSocketDisconnect as exc:
-#         logger.info(f"client disconnected: [{exc.code}] {exc.reason}")
-#         raise
-
-#     finally:
-#         logger.info("shutdown listener")
-
-
-# //-----//-----//-----//-----//-----//-----//-----//-----//-----
-
-
+# TODO access event loop to run bus listener
+# https://github.com/encode/uvicorn/issues/706
 def run(app: App, *, host: str = "localhost", port: int = 5000) -> None:
     logger.info("Building web UI...")
     subprocess.run(["npm", "run", "build"])  # FIXME control outputa and redirect to logger
