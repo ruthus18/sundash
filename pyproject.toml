@@ -12,13 +12,13 @@ starlette = "^0.31.1"
 colorlog = "^6.7.0"
 
 [tool.poetry.group.dev.dependencies]
-ipython = "^8.16.1"
+ipython = "^8.17.2"
 ipdb = "^0.13.13"
 flake8 = "^6.1.0"
 flake8-pyproject = "^1.2.3"
 isort = "^5.12.0"
-black = "^23.10.0"
-poethepoet = "^0.24.1"  # no more! makefile is ur friend :)
+black = "^23.11.0"
+poethepoet = "^0.24.2"  # no more! makefile is ur friend :)
 
 [build-system]
 requires = ["poetry-core"]

@@ -122,12 +122,16 @@ class AppServer:
 
     ALLOWED_STATIC_FILES = (".html", "css", ".js", ".map", ".ico")
 
+    class _Server(uvicorn.Server):
+        def install_signal_handlers(self) -> None:
+            pass  # catch server interrupt
+
     def __init__(self):
         add_handler(CMD_CALL, self.call_command)
 
     async def run(self, **config_params: dict) -> None:
         config = uvicorn.Config(app=self, **config_params)
-        server = uvicorn.Server(config=config)
+        server = self._Server(config=config)
         await server.serve()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -213,7 +217,13 @@ def run(app: App, *, host: str = "localhost", port: int = 5000) -> None:
     server_task = app.server.run(host=host, port=port, log_level="debug", log_config=log_config)
     bus_listener_task = listener_task()
 
-    asyncio.run(_run(server_task, bus_listener_task))
+    try:
+        asyncio.run(_run(server_task, bus_listener_task))
+    except KeyboardInterrupt:
+        pass
+
+    finally:
+        logger.info('Shutting down server')
 
 
 async def _run(*tasks: t.Iterable[t.Awaitable]) -> None:
