@@ -18,6 +18,9 @@ from starlette.types import Send
 from starlette.websockets import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+from .bus import C_APPEND_COMPONENT
+from .bus import C_CLEAR_LAYOUT
+from .bus import C_UPDATE_VAR
 from .bus import CLIENT_CONNECTED
 from .bus import CLIENT_DISCONNECTED
 from .bus import CMD_CALL
@@ -28,6 +31,7 @@ from .bus import Signal
 from .bus import SignalData
 from .bus import SignalHandler
 from .bus import add_handler
+from .bus import call_command
 from .bus import emit_signal
 from .bus import listener_task
 from .logging import log_config
@@ -44,11 +48,13 @@ class Var(t.Generic[_V]):
 class Component:
     html: str = ''
 
-    async def set(self, name, value):
+    async def set(self, name: str, value: t.Any) -> None:
         if type_annotation := self.__annotations__.get(name):
             if type_annotation.__origin__ is Var:
-                await emit_signal(CMD_CALL, {'command': 'update_var', 'params': {'name': name, 'value': str(value)}})
-
+                await call_command(
+                    C_UPDATE_VAR,
+                    {'name': name, 'value': str(value)},
+                )
         setattr(self, name, value)
 
 
@@ -98,12 +104,28 @@ class App:
         self.layout.append(component)
 
     async def _on_client_connected(self, data: dict) -> None:
-        await emit_signal(CMD_CALL, {'command': 'clear_layout'})
+        await call_command(C_CLEAR_LAYOUT)
 
-    async def _on_layout_clean(self, data: dict) -> None:
+    # FIXME: refactor mad tech
+    async def _on_layout_clean(self, data: dict) -> None:  # noqa: C901
         for component in self.layout:
-            await emit_signal(CMD_CALL, {'command': 'append_component', 'params': {'html': component.html}})
+            await call_command(C_APPEND_COMPONENT, {'html': component.html})
 
+            for field, annotation in component.__annotations__.items():
+                try:
+                    annotation_origin = annotation.__origin__
+                except AttributeError:
+                    continue
+
+                # set init value of var
+                if annotation_origin is Var:
+                    init_value = getattr(component, field)
+                    if isinstance(init_value, t.Callable):
+                        init_value = init_value.__func__()
+
+                    await call_command(C_UPDATE_VAR, {'name': field, 'value': init_value})
+
+            # connect component signal handlers
             component_name = component.__class__.__name__
             if component_name in self.layout_handlers:
                 for signal, handler_name in self.layout_handlers[component_name]:
@@ -114,8 +136,10 @@ class App:
 class AppServer:
     """Proxy entrypoint for all incoming requests from client side.
 
-    Responsible for managing low-level backend operations like requests routing, handling and responding.
-    In some cases, return control flow to the main app, calling interface methods: emitting signals, handling bus.
+    Responsible for managing low-level backend operations
+      like requests routing, handling and responding.
+    In some cases, return control flow to the main app, calling interface methods:
+      emitting signals, handling bus.
     """
 
     _EXIT_CODE = 1
@@ -127,7 +151,7 @@ class AppServer:
             pass  # catch server interrupt
 
     def __init__(self):
-        add_handler(CMD_CALL, self.call_command)
+        add_handler(CMD_CALL, self.on_call_command)
 
     async def run(self, **config_params: dict) -> None:
         config = uvicorn.Config(app=self, **config_params)
@@ -204,7 +228,7 @@ class AppServer:
             await emit_signal(CLIENT_DISCONNECTED, {'code': exc.code, 'reason': exc.reason})
             # raise
 
-    async def call_command(self, data):
+    async def on_call_command(self, data: dict) -> None:
         command, params = data['command'], data.get('params', {})
         await self._s.send_text(f'{command} {json.dumps(params)}')
 
