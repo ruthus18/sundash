@@ -7,9 +7,23 @@
 * **Realtime** -- operating through websockets bus, callback-based client <-> server communication
 * **Crafted with ❤️**
 
-Launch: `python -m app`
 
-~~Check examples~~  *Work in progress, making proto...*
+**Usage:** check `examples` folder
+
+To run example, create a file `test.py`:
+
+```python
+from examples._01_clock import app
+from sundash.core import run
+
+run(app)
+```
+
+And run:
+
+```bash
+python -m test
+```
 
 
 ### В чем идея?
@@ -22,25 +36,37 @@ Launch: `python -m app`
 преимущественно на Python с минимальным использованием JavaScript-а,
 без тяжеловесного инструментария фронтендеров (React и пр).
 
-Чтобы в конечном итоге написание компонентов веб-морды выглядело так:
+
+### Basic example
 
 ```python
-from sundash import App, Component, Signal
+import datetime as dt
 
+from sundash.bus import EVERY_SECOND
+from sundash.core import App
+from sundash.core import Component
+from sundash.core import Var
+from sundash.core import run
 
 app = App()
 
-
-class CurrentTime(Component):
-    html = '<p>{{ value }}<p/>'
-
-    # Каждый инстанс должен хранить эти переменные в памяти и восстанавливать
-    value: Var[dt.time] = None
-
-    @app.on(Signal.EVERY_SECOND)
-    def update(self):
-        self.value = dt.time.now()
+now = lambda: dt.datetime.now().strftime('%H:%M:%S')
 
 
-app.run(layout=[CurrentTime()])
+class Clock(Component):
+    html = '<p><b>Time: </b> {{ time }}<p/>'
+
+    time: Var[str] = now
+
+    @app.on(EVERY_SECOND)
+    async def update(self, _):
+        await self.set('time', now())
+
+
+app.attach_to_layout('<h1>Clock Test</h1>')
+app.attach_to_layout(Clock())
+
+run(app)
 ```
+
+![clock](docs/example_01_clock.png "Clock")
