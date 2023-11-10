@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "sundash"
 version = "0.1.0"
-description = ""
+description = "Python & JS micro framework for realtime web UI applications"
 authors = ["Danil Tryapchev <ruthus18@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 uvicorn = {extras = ["standard"], version = "^0.23.2"}
 starlette = "^0.31.1"
 colorlog = "^6.7.0"
@@ -34,7 +34,7 @@ ignore = [
 ]
 
 [tool.black]
-target-version = ["py311"]
+target-version = ["py312"]
 line-length = 120
 skip-string-normalization = true
 
