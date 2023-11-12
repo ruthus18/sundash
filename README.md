@@ -32,11 +32,11 @@
 ```python
     import datetime as dt
 
+    from sundash import App
+    from sundash import Component
+    from sundash import Var
     from sundash.bus import EVERY_SECOND
-    from sundash.core import App
-    from sundash.core import Component
-    from sundash.core import Var
-    from sundash.core import run
+    
 
     app = App()
 
@@ -56,7 +56,15 @@
     app.attach_to_layout('<h1>Clock Test</h1>')  # add plain HTML
     app.attach_to_layout(Clock())                # or own components
 
-    run(app)
+    app.run()
 ```
 
 ![clock](docs/examples/_01_clock.png "Clock")
+
+
+### Development
+
+* Required: npm, nodejs, python 3.12, poetry, virtualenv
+* Install JS dependencies: `npm install`
+* Install Python dependencies: `poetry install --with=dev`
+* Run local linters: `poe q`

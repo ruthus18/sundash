@@ -1,9 +1,9 @@
 import datetime as dt
 
+from sundash import App
+from sundash import Component
+from sundash import Var
 from sundash.bus import EVERY_SECOND
-from sundash.core import App
-from sundash.core import Component
-from sundash.core import Var
 
 app = App()
 

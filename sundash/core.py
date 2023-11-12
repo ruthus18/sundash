@@ -18,6 +18,7 @@ from starlette.types import Send
 from starlette.websockets import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+from . import bus
 from .bus import C_APPEND_COMPONENT
 from .bus import C_CLEAR_LAYOUT
 from .bus import C_UPDATE_VAR
@@ -33,7 +34,6 @@ from .bus import SignalHandler
 from .bus import add_handler
 from .bus import call_command
 from .bus import emit_signal
-from .bus import listener_task
 from .logging import log_config
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ class Var(t.Generic[_V]):
 class Component:
     html: str = ''
 
+    # FIXME: refactor mad tech
     async def set(self, name: str, value: t.Any) -> None:
         if type_annotation := self.__annotations__.get(name):
             if type_annotation.__origin__ is Var:
@@ -60,7 +61,6 @@ class Component:
 
 # High-level interface
 class App:
-
     def __init__(self):
         self.server = AppServer()
         self.layout: list = []
@@ -101,6 +101,7 @@ class App:
                     handler = getattr(component, handler_name)
                     add_handler(signal, handler)
 
+    # FIXME: refactor mad tech
     def on(self, signal: Signal) -> t.Awaitable:
         def wrapper(f: SignalHandler):
             @functools.wraps(f)
@@ -139,12 +140,12 @@ class App:
 
 
 class AppServer:
-    """Proxy entrypoint for all incoming requests from client side.
+    """ASGI backend entrypoint
 
-    Responsible for managing low-level backend operations
-      like requests routing, handling and responding.
-    In some cases, return control flow to the main app, calling interface methods:
-      emitting signals, handling bus.
+    * listen port and handle HTTP, WS and staticfiles requests
+    * submit bus handler to control frontend (`.on_call_command`)
+    * emit system signals
+    * redirect signal requests to bus
     """
 
     _EXIT_CODE = 1
@@ -153,7 +154,9 @@ class AppServer:
 
     class _Server(uvicorn.Server):
         def install_signal_handlers(self) -> None:
-            pass  # catch server interrupt
+            # replace default signal catch
+            # because I want `Ctrl + C` to work correct
+            pass
 
     def __init__(self):
         add_handler(CMD_CALL, self.on_call_command)
@@ -163,8 +166,7 @@ class AppServer:
         await self._s.send_text(f'{command} {json.dumps(params)}')
 
     def run(self, host: str, port: int) -> None:
-        logger.info("Building web UI...")
-        subprocess.run(["npm", "run", "build"])  # FIXME control output and redirect to logger
+        build_ui()
 
         logger.info(f"Starting server at http://{host}:{port}/")
         server_task = self.server_task(
@@ -173,7 +175,7 @@ class AppServer:
             log_level="debug",
             log_config=log_config,
         )
-        bus_listener_task = listener_task()
+        bus_listener_task = bus.listener_task()
 
         try:
             asyncio.run(_run_tasks(server_task, bus_listener_task))
@@ -236,7 +238,7 @@ class AppServer:
 
     async def handle_websocket_request(self, scope: Scope, receive: Receive, send: Send) -> None:
         socket = WebSocket(scope=scope, receive=receive, send=send)
-        self._s = socket  # FIXME: client sessions
+        self._s = socket  # FIXME client sessions
         await socket.accept()
 
         data = await socket.receive_text()
@@ -256,7 +258,15 @@ class AppServer:
 
         except WebSocketDisconnect as exc:
             await emit_signal(CLIENT_DISCONNECTED, {'code': exc.code, 'reason': exc.reason})
-            # raise
+            # raise  # FIXME client sessions
+
+
+# TODO  maybe separate system part?
+#       (~ bash & `manage.py` replacement)
+def build_ui():
+    logger.info("Building web UI...")
+    # FIXME control output and redirect to logger
+    subprocess.run(["npm", "run", "build"])
 
 
 async def _run_tasks(*tasks: t.Iterable[t.Awaitable]) -> None:
