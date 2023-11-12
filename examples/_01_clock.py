@@ -23,3 +23,5 @@ class Clock(Component):
 
 app.attach_to_layout('<h1>Clock Test</h1>')
 app.attach_to_layout(Clock())
+
+app.run()
