@@ -135,7 +135,14 @@ class App:
 
         self.layout.append(component)
 
-    def run(self, host: str = "localhost", port: int = 5000) -> None:
+    def run(
+        self,
+        layout: list[Component],
+        host: str = 'localhost',
+        port: int = 5000,
+    ) -> None:
+        for comp in layout:
+            self.attach_to_layout(comp)
         self.server.run(host, port)
 
 

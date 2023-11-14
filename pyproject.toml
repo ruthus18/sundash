@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sundash"
-version = "0.1.0"
+version = "0.0.2"
 description = "Python & JS micro framework for realtime web UI applications"
 authors = ["Danil Tryapchev <ruthus18@gmail.com>"]
 readme = "README.md"
@@ -28,28 +28,25 @@ build-backend = "poetry.core.masonry.api"
 max-complexity = 8
 max-line-length = 120
 ignore = [
+    "E701",  # multiple statements on one line
     "E704",  # multiple statements on one line
     "E203",  # whitespace before ':'
     "E731",  # do not assign a lambda expression, use a def
 ]
-
-[tool.black]
-target-version = ["py312"]
-line-length = 120
-skip-string-normalization = true
+exclude = [
+    "node_modules"
+]
 
 [tool.isort]
 multi_line_output = 3
-line_length = 120
+line_length = 79
 include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
 balanced_wrapping = true
 force_single_line = true
-profile = "black"
 
 [tool.poe.tasks]
 _isort = "isort --overwrite-in-place ."
-_black = "black ."
 _flake8 = "flake8p ."
-q = ["_isort", "_black", "_flake8"]  # q for quality :)
+q = ["_isort", "_flake8"]  # q for quality :)
