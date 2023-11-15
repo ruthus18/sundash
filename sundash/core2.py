@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import functools
 import typing as t
+from dataclasses import dataclass
+
+from starlette.websockets import WebSocket
 
 # 1. Basics
 
@@ -19,7 +21,7 @@ type HTML = str
 
 # 2. Signals & Commands
 
-@dataclasses.dataclass
+@dataclass
 class SIGNAL: ...
 
 
@@ -29,15 +31,26 @@ class CLIENT_CONNECTED(SIGNAL): ...
 class CLIENT_DISCONNECTED(SIGNAL): ...
 class LAYOUT_UPDATED(SIGNAL): ...
 class LAYOUT_CLEAN(SIGNAL): ...
+class EVERY_SECOND(SIGNAL): ...
 
 
-@dataclasses.dataclass
+@dataclass
 class COMMAND: ...
 
 
+@dataclass
 class SET_VAR(COMMAND):
     key: Var.Key
     value: Var.Value
+
+
+class CLEAR_LAYOUT(COMMAND): ...
+
+
+@dataclass
+class UPDATE_LAYOUT(COMMAND):
+    html: HTML
+    vars: VarStorage
 
 
 _signals: asyncio.Queue[SIGNAL] = asyncio.Queue()
@@ -59,9 +72,13 @@ async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
 class Component:
     html: HTML = ''
 
-    def collect_vars(cls):
-        ...  # TODO
+    class Storage: NotImplemented
 
+    @classmethod
+    def get_vars(cls) -> tuple[Var.Key]:
+        return tuple(cls.Storage.__annotations__.keys())
+
+    @classmethod
     async def set(self, key: str, value: str) -> None:
         setattr(self, key, value)
         await send_command(SET_VAR(key=key, value=value))
@@ -69,34 +86,39 @@ class Component:
 
 # 4. Signal Callbacks
 
-type _ComponentSignalCallback = t.Callable[[Component, SIGNAL], None]
-type _ModuleSignalCallback = t.Callable[[SIGNAL], None]
+type _SignalClassCallback = t.Callable[[object, SIGNAL], None]
+type _SignalModuleCallback = t.Callable[[SIGNAL], None]
 
-type ComponentSignalCallback = t.Awaitable[_ComponentSignalCallback]
-type ModuleSignalCallback = t.Awaitable[_ModuleSignalCallback]
+type SignalClassCallback = t.Awaitable[_SignalClassCallback]
+type SignalModuleCallback = t.Awaitable[_SignalModuleCallback]
 
-type SignalCallback = ComponentSignalCallback | ModuleSignalCallback
-
-
-async def subscribe(signal: SIGNAL, callback: SignalCallback) -> None:
-    ...
+type _SignalCallbackRaw = SignalClassCallback | SignalModuleCallback
+type SignalCallback = SignalModuleCallback
 
 
-# TODO maybe app don't need...
-def on_signal(app: App, signal_cls: type[SIGNAL]) -> SignalCallback:
-    def wrapper(func: SignalCallback):
+_callbacks: dict[SIGNAL, set[SignalCallback]] = {}
 
-        async def module_callback(signal: SIGNAL) -> None:
-            return await func(signal)
 
-        async def component_callback(self: Component, signal: SIGNAL) -> None:
-            return await func(self, signal)
+def subscribe(signal_cls: type[SIGNAL], callback: SignalCallback) -> None:
+    if signal_cls not in _callbacks:
+        _callbacks[signal_cls] = set()
 
-        # TODO define callback type based on passed func
-        callback: SignalCallback = module_callback or component_callback
+    _callbacks[signal_cls].add(callback)
 
-        ...  # TODO add callback to scheduler
-        return functools.wraps(func)(callback)
+
+def on(signal_cls: type[SIGNAL]) -> SignalCallback:
+    def wrapper(func: _SignalCallbackRaw) -> SignalCallback:
+
+        callback: SignalCallback = None
+        try:
+            self = callback.__self__
+            callback = lambda sig: func(self, sig)
+        except AttributeError:
+            callback = lambda sig: func(sig)
+
+        callback = functools.wraps(func)(callback)
+        subscribe(signal_cls, callback)
+        return func
 
     return wrapper
 
@@ -104,6 +126,7 @@ def on_signal(app: App, signal_cls: type[SIGNAL]) -> SignalCallback:
 # 5. Server & Layout
 
 class _Server:
+    _connections: set[WebSocket] = set()
 
     @classmethod
     async def listen_connections(cls, host: str, port: int) -> None:
@@ -111,6 +134,10 @@ class _Server:
 
         # await send_signal(CLIENT_CONNECTED)
         # await send_signal(CLIENT_DISCONNECTED)
+
+    async def task(self) -> None:
+        command: COMMAND = await _commands.get()
+        ...
 
 
 class _Layout:
@@ -122,41 +149,51 @@ class _Layout:
         cls._current.append(comp)
 
     @classmethod
-    def get_current(cls) -> tuple[HTML, dict]:
+    def get_current(cls) -> tuple[HTML, VarStorage]:
         html = ''
         for comp in cls._current:
             html += comp.html
+
+        return html, cls._storage.copy()
+
+
+@on(SERVER_STARTUP)
+async def on_server_startup(_): print('SERVER_STARTUP')
+
+
+@on(SERVER_SHUTDOWN)
+async def on_server_shutdown(_): print('SERVER_SHUTDOWN')
 
 
 # 6. App
 
 class App:
-    type Server = _Server
-    type Layout = _Layout
-    on = on_signal
+    Server = _Server
+    Layout = _Layout
 
     def run(self, **params: dict) -> None:
-        asyncio.run(self.main_task(**params))
+        asyncio.run(self.task(**params))
 
-    async def main_task(
+    async def task(
         self,
-        layout: list[Component],
+        layout: list[Component] = [],
         host: str = 'localhost',
         port: int = 5000,
     ) -> None:
         for comp in layout: self.Layout.append(comp)
 
-        self.on(CLIENT_CONNECTED)(self.on_client_connected)
-        self.on(CLIENT_DISCONNECTED)(self.on_client_disconnected)
-        self.on(LAYOUT_CLEAN)(self.on_layout_clean)
+        on(CLIENT_CONNECTED)(self.on_client_connected)
+        on(CLIENT_DISCONNECTED)(self.on_client_disconnected)
+        on(LAYOUT_CLEAN)(self.on_layout_clean)
 
         await self.Server.listen_connections(host, port)
 
     async def on_client_connected(self, sig: CLIENT_CONNECTED) -> None:
-        ...
+        await send_command()
 
     async def on_client_disconnected(self, sig: CLIENT_DISCONNECTED) -> None:
         ...
 
     async def on_layout_clean(self, sig: LAYOUT_CLEAN) -> None:
-        ...
+        html, vars = self.Layout.get_current()
+        await send_command(UPDATE_LAYOUT(html=html, vars=vars))
