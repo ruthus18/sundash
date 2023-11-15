@@ -17,7 +17,6 @@ ipdb = "^0.13.13"
 flake8 = "^6.1.0"
 flake8-pyproject = "^1.2.3"
 isort = "^5.12.0"
-black = "^23.11.0"
 poethepoet = "^0.24.2"
 
 [build-system]
@@ -32,9 +31,10 @@ ignore = [
     "E704",  # multiple statements on one line
     "E203",  # whitespace before ':'
     "E731",  # do not assign a lambda expression, use a def
+    "E402",  # module level import not at top of file
 ]
 exclude = [
-    "node_modules"
+    "node_modules",
 ]
 
 [tool.isort]
