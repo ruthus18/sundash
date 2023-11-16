@@ -43,8 +43,13 @@ class EVERY_SECOND(SIGNAL): ...
 
 @dataclass
 class COMMAND:
-    def get_message(self) -> tuple[str, dict]:
-        return self.__class__.__name__, self.__dict__
+    @property
+    def _name(self) -> str:
+        return self.__class__.__name__
+
+    @property
+    def _data(self) -> dict:
+        return self.__dict__
 
 
 @dataclass

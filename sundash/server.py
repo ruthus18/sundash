@@ -1,9 +1,9 @@
 import asyncio
-from dataclasses import dataclass
 import json
 import logging
 import subprocess
 import typing as t
+from dataclasses import dataclass
 
 import uvicorn
 from starlette.requests import Request
@@ -15,9 +15,9 @@ from starlette.types import Send
 from starlette.websockets import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
-from .core import SIGNAL
 from .core import COMMAND
 from .core import HTML
+from .core import SIGNAL
 from .core import reg_signal
 from .logging import log_config
 
@@ -59,7 +59,7 @@ class WSConnection:
 
 class Server:
     _EXIT_CODE = 1
-    ALLOWED_STATIC_FILES = (".html", "css", ".js", ".map", ".ico")
+    ALLOWED_STATIC_FILES = ('.html', 'css', '.js', '.map', '.ico')
 
     class _ASGIServer(uvicorn.Server):
         def install_signal_handlers(self) -> None:
@@ -81,12 +81,12 @@ class Server:
         self._connections: dict[int: WSConnection] = {}
 
     async def task(self) -> None:
-        logger.info(f"Starting server at http://{self.host}:{self.port}/")
+        logger.info(f'Starting server at http://{self.host}:{self.port}/')
 
         server_task = self.server_task(
             host=self.host,
             port=self.port,
-            log_level="debug",
+            log_level='debug',
             log_config=log_config,
         )
         # listener_task = self.listener_task()
@@ -109,20 +109,20 @@ class Server:
     async def __call__(
         self, scope: Scope, receive: Receive, send: Send
     ) -> None:
-        if scope["type"] == "lifespan":
+        if scope['type'] == 'lifespan':
             exit_code = await self._handle_lifespan(scope, receive, send)
             if exit_code:
                 return
 
-        elif scope["type"] == "http":
+        elif scope['type'] == 'http':
             await self._handle_http_request(scope, receive, send)
 
-        elif scope["type"] == "websocket":
+        elif scope['type'] == 'websocket':
             await self._handle_websocket_request(scope, receive, send)
 
         else:
             response = HTMLResponse(
-                content="<b>Not allowed</b>", status_code=405
+                content='<b>Not allowed</b>', status_code=405
             )
             await response(scope, receive, send)
 
@@ -131,12 +131,12 @@ class Server:
     ) -> int | None:
         message = await receive()
 
-        if message["type"] == "lifespan.startup":
-            await send({"type": "lifespan.startup.complete"})
+        if message['type'] == 'lifespan.startup':
+            await send({'type': 'lifespan.startup.complete'})
             return None
 
-        elif message["type"] == "lifespan.shutdown":
-            await send({"type": "lifespan.shutdown.complete"})
+        elif message['type'] == 'lifespan.shutdown':
+            await send({'type': 'lifespan.shutdown.complete'})
             return self._EXIT_CODE
 
         else:
@@ -150,7 +150,7 @@ class Server:
         path = request.url.components.path
 
         if any([path.endswith(ext) for ext in self.ALLOWED_STATIC_FILES]):
-            static_files = StaticFiles(directory="static")
+            static_files = StaticFiles(directory='static')
             await static_files(scope, receive, send)
 
         else:
@@ -193,9 +193,9 @@ class Server:
 
 
 def build_ui():
-    logger.info("Building web UI...")
+    logger.info('Building web UI...')
     # FIXME control output and redirect to logger
-    subprocess.run(["npm", "run", "build"])
+    subprocess.run(['npm', 'run', 'build'])
 
 
 async def run_tasks(*tasks: t.Iterable[t.Awaitable]) -> None:
