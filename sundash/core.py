@@ -23,17 +23,16 @@ type HTML = str
 # 2. Signals & Commands
 
 @dataclass
-class SIGNAL: ...
+class SIGNAL:
+    @property
+    def _name(self) -> str:
+        return self.__class__.__name__
+
+    @property
+    def _data(self) -> dict:
+        return self.__dict__
 
 
-@dataclass
-class SERVER_STARTUP(SIGNAL): ...
-@dataclass
-class SERVER_SHUTDOWN(SIGNAL): ...
-@dataclass
-class CLIENT_CONNECTED(SIGNAL): ...
-@dataclass
-class CLIENT_DISCONNECTED(SIGNAL): ...
 @dataclass
 class LAYOUT_UPDATED(SIGNAL): ...
 @dataclass
@@ -55,7 +54,8 @@ class SET_VAR(COMMAND):
 
 
 @dataclass
-class CLEAR_LAYOUT(COMMAND): ...
+class CLEAR_LAYOUT(COMMAND):
+    ...
 
 
 @dataclass
@@ -68,9 +68,11 @@ _signals: asyncio.Queue[SIGNAL] = asyncio.Queue()
 _commands: asyncio.Queue[COMMAND] = asyncio.Queue()
 
 
-async def send_signal(sig: SIGNAL | type[SIGNAL]) -> None:
+async def reg_signal(sig: SIGNAL | type[SIGNAL]) -> None:
     if not isinstance(sig, SIGNAL): sig = sig()
     await _signals.put(sig)
+
+    logger.info(f'{sig._name} {sig._data}')
 
 
 async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
@@ -179,18 +181,18 @@ class App:
     ) -> None:
         for comp in layout: self.Layout.append(comp)
 
-        on(CLIENT_CONNECTED)(self.on_client_connected)
-        on(CLIENT_DISCONNECTED)(self.on_client_disconnected)
-        on(LAYOUT_CLEAN)(self.on_layout_clean)
+        # on(CLIENT_CONNECTED)(self.on_client_connected)
+        # on(CLIENT_DISCONNECTED)(self.on_client_disconnected)
+        # on(LAYOUT_CLEAN)(self.on_layout_clean)
 
         await self.Server.task(host, port)
 
-    async def on_client_connected(self, sig: CLIENT_CONNECTED) -> None:
-        ...
+    # async def on_client_connected(self, sig: CLIENT_CONNECTED) -> None:
+    #     ...
 
-    async def on_client_disconnected(self, sig: CLIENT_DISCONNECTED) -> None:
-        ...
+    # async def on_client_disconnected(self, sig: CLIENT_DISCONNECTED) -> None:
+    #     ...
 
-    async def on_layout_clean(self, sig: LAYOUT_CLEAN) -> None:
-        html, vars = self.Layout.get_current()
-        await send_command(UPDATE_LAYOUT(html=html, vars=vars))
+    # async def on_layout_clean(self, sig: LAYOUT_CLEAN) -> None:
+    #     html, vars = self.Layout.get_current()
+    #     await send_command(UPDATE_LAYOUT(html=html, vars=vars))

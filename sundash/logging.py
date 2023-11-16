@@ -28,14 +28,14 @@ log_config = {
             "handlers": ["stdout"],
             "level": logging.DEBUG,
         },
-        # "uvicorn": {
-        #     "handlers": ["null"],
-        #     "propagate": False,
-        # },
-        # "asyncio": {
-        #     "handlers": ["null"],
-        #     "propagate": False,
-        # },
+        "uvicorn": {
+            "handlers": ["null"],
+            "propagate": False,
+        },
+        "asyncio": {
+            "handlers": ["null"],
+            "propagate": False,
+        },
     },
 }
 

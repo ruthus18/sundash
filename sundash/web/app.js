@@ -9,15 +9,10 @@ let Command = {
 
 socket.onopen = event => {
     console.log(`[WS] CONN_OPEN: ${event.target.url}`)
-    socket.send('LOGIN')
 }
 
 socket.onmessage = event => {
     console.log(`[WS] DATA_RECV: ${event.data}`)
-    if (event.data === 'LOGIN OK') {
-        return
-    }
-
     let [name, ...data] = event.data.split(" ")
     data = data.join(" ")
     if (data != undefined) {

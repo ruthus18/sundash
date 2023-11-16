@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 import json
 import logging
 import subprocess
@@ -14,13 +15,23 @@ from starlette.types import Send
 from starlette.websockets import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
-from .core import CLIENT_CONNECTED
-from .core import CLIENT_DISCONNECTED
+from .core import SIGNAL
 from .core import COMMAND
-from .core import send_signal
+from .core import HTML
+from .core import reg_signal
 from .logging import log_config
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CLIENT_CONNECTED(SIGNAL):
+    client_id: int
+
+
+@dataclass
+class CLIENT_DISCONNECTED(SIGNAL):
+    client_id: int
 
 
 _id = 0
@@ -56,9 +67,18 @@ class Server:
             # because I want `Ctrl + C` to work correct
             pass
 
-    def __init__(self, host: str = 'localhost', port: int = 5000):
+    def __init__(
+        self,
+        host: str = 'localhost',
+        port: int = 5000,
+        html_title: str = 'Sundash',
+    ):
         self.host = host
         self.port = port
+        self.html_title = html_title
+
+        self._index_html: str = None
+        self._connections: dict[int: WSConnection] = {}
 
     async def task(self) -> None:
         logger.info(f"Starting server at http://{self.host}:{self.port}/")
@@ -134,26 +154,28 @@ class Server:
             await static_files(scope, receive, send)
 
         else:
-            with open("static/index.html") as f:
-                response = HTMLResponse(content=f.read(), status_code=200)
-                await response(scope, receive, send)
+            content = self._get_index_html_content()
+            response = HTMLResponse(content=content, status_code=200)
+            await response(scope, receive, send)
+
+    def _get_index_html_content(self) -> HTML:
+        if not self._index_html:
+            with open('static/index.html') as f:
+                self._index_html = (
+                    f.read().replace('{{ _app_title }}', self.html_title)
+                )
+        return self._index_html
 
     async def _handle_websocket_request(
         self, scope: Scope, receive: Receive, send: Send
     ) -> None:
-
         socket = WebSocket(scope=scope, receive=receive, send=send)
-        self._s = socket  # FIXME client sessions
         await socket.accept()
 
-        data = await socket.receive_text()
-        if data != 'LOGIN':
-            await socket.close(code=1008)
-            return
+        conn = WSConnection(socket)
+        self._connections[conn.id] = conn
 
-        await socket.send_text('LOGIN OK')
-        await send_signal(CLIENT_CONNECTED)
-
+        await reg_signal(CLIENT_CONNECTED(client_id=conn.id))
         try:
             while True:
                 message = await socket.receive_text()  # noqa
@@ -163,8 +185,11 @@ class Server:
                 # await emit_signal(signal=signal, data=json.loads(data))
 
         except WebSocketDisconnect:
-            await send_signal(CLIENT_DISCONNECTED)
-            # raise exc
+            pass
+
+        finally:
+            await reg_signal(CLIENT_DISCONNECTED(client_id=conn.id))
+            self._connections.pop(conn.id)
 
 
 def build_ui():
