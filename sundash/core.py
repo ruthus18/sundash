@@ -40,8 +40,17 @@ class SIGNAL(_MESSAGE): ...
 
 @dataclass
 class LAYOUT_UPDATED(SIGNAL): ...
+
+
 @dataclass
 class LAYOUT_CLEAN(SIGNAL): ...
+
+
+@dataclass
+class BUTTON_CLICK(SIGNAL):
+    button_id: str
+
+
 @dataclass
 class EVERY_SECOND(SIGNAL): ...
 
@@ -57,8 +66,7 @@ class SET_VAR(COMMAND):
 
 
 @dataclass
-class CLEAR_LAYOUT(COMMAND):
-    ...
+class CLEAR_LAYOUT(COMMAND): ...
 
 
 @dataclass
@@ -101,7 +109,7 @@ class Component:
     #     return tuple(cls.Storage.__annotations__.keys())
 
     @classmethod
-    async def set(self, key: str, value: str) -> None:
+    async def set(self, key: Var.Key, value: Var.Value) -> None:
         setattr(self, key, value)
         await send_command(SET_VAR(key=key, value=value))
 
@@ -184,14 +192,12 @@ class App:
 
     async def task(
         self,
-        layout: list[Component | HTML] = [],
-        host: str = 'localhost',
-        port: int = 5000,
+        layout: t.Iterable[Component | HTML] = [],
     ) -> None:
         for comp in layout: self.layout.append(comp)
 
         from . import server
-        self.server = server.Server(host, port)
+        self.server = server.Server()
 
         on(server.CLIENT_CONNECTED)(self.on_client_connected)
         await self.server.task()

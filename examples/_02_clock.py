@@ -3,6 +3,7 @@ import datetime as dt
 from sundash.core import EVERY_SECOND
 from sundash.core import App
 from sundash.core import Component
+from sundash.core import on
 
 app = App()
 
@@ -16,9 +17,9 @@ class Clock(Component):
     class Vars:
         time: str = now
 
-    # @app.on(EVERY_SECOND)
-    # async def update(self, _):
-    #     await self.set('time', now())
+    @on(EVERY_SECOND)
+    async def update(self, _):
+        await self.set('time', now())
 
 
-app.run(layout=['<h1>Clock Test</h1>', Clock()])
+app.run(layout=('<h1>Clock</h1>', Clock()))
