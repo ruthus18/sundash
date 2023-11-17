@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextvars
 import functools
 import logging
 import typing as t
@@ -17,14 +16,13 @@ class Var[T]:
     type Value = T
 
 
-type VarStorage = dict[Var.Key, Var.Value]
+# type VarStorage = dict[Var.Key, Var.Value]
 type HTML = str
 
 
 # 2. Signals & Commands
 
-@dataclass
-class SIGNAL:
+class _MESSAGE:
     type Name = str
 
     @property
@@ -37,6 +35,10 @@ class SIGNAL:
 
 
 @dataclass
+class SIGNAL(_MESSAGE): ...
+
+
+@dataclass
 class LAYOUT_UPDATED(SIGNAL): ...
 @dataclass
 class LAYOUT_CLEAN(SIGNAL): ...
@@ -45,14 +47,7 @@ class EVERY_SECOND(SIGNAL): ...
 
 
 @dataclass
-class COMMAND:
-    @property
-    def _name(self) -> str:
-        return self.__class__.__name__
-
-    @property
-    def _data(self) -> dict:
-        return self.__dict__
+class COMMAND(_MESSAGE): ...
 
 
 @dataclass
@@ -68,13 +63,12 @@ class CLEAR_LAYOUT(COMMAND):
 
 @dataclass
 class UPDATE_LAYOUT(COMMAND):
-    html: HTML
-    vars: VarStorage
+    ...
+    # html: HTML
+    # vars: VarStorage
 
 
 signals_by_name = {c.__name__: c for c in SIGNAL.__subclasses__()}
-
-_conn = contextvars.ContextVar('_conn', default=None)
 
 
 async def emit_signal(sig: SIGNAL | type[SIGNAL]) -> None:
@@ -85,11 +79,14 @@ async def emit_signal(sig: SIGNAL | type[SIGNAL]) -> None:
         await callback(sig)
 
 
+from .server import get_connection
+
+
 async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
     if not isinstance(cmd, COMMAND): cmd = cmd()
     logger.info(f'{cmd._name} {cmd._data}')
 
-    conn = _conn.get()
+    conn = get_connection()
     await conn.send_command(cmd)
 
 
@@ -126,7 +123,7 @@ _callbacks: dict[SIGNAL.Name, set[SignalCallback]] = {}
 
 
 def subscribe(signal_cls: type[SIGNAL], callback: SignalCallback) -> None:
-    sig_name = signal_cls._name
+    sig_name = signal_cls.__name__
     if sig_name not in _callbacks:
         _callbacks[sig_name] = set()
 
@@ -138,12 +135,13 @@ def on(signal_cls: type[SIGNAL]) -> SignalCallback:
 
         callback: SignalCallback = None
         try:
-            is_comp_callback = True
+            cls = callback.__self__
         except AttributeError:
             is_comp_callback = False
+        else:
+            is_comp_callback = True
 
         if is_comp_callback:
-            cls = callback.__self__
             callback = lambda sig: func(cls, sig)
         else:
             callback = lambda sig: func(sig)
@@ -155,35 +153,35 @@ def on(signal_cls: type[SIGNAL]) -> SignalCallback:
     return wrapper
 
 
-# 5. Server & Layout
+# 5. Layout
 
-from .server import CLIENT_CONNECTED
-from .server import CLIENT_DISCONNECTED
-from .server import Server
+# class _Layout:
+#     _current: list[Component] = []
+#     _storage: VarStorage = {}
 
+#     @classmethod
+#     def append(cls, comp: Component) -> None:
+#         cls._current.append(comp)
 
-class _Layout:
-    _current: list[Component] = []
-    _storage: VarStorage = {}
-
-    @classmethod
-    def append(cls, comp: Component) -> None:
-        cls._current.append(comp)
-
-    @classmethod
-    def get_current(cls) -> tuple[HTML, VarStorage]:
-        html = ''.join([comp.html for comp in cls._current])
-        return html, cls._storage.copy()
+#     @classmethod
+#     def get_current(cls) -> tuple[HTML, VarStorage]:
+#         html = ''.join([comp.html for comp in cls._current])
+#         return html, cls._storage.copy()
 
 
 # 6. App
 
 class App:
-    Server = Server
-    Layout = _Layout
+    # Layout = _Layout
 
     def run(self, **params: dict) -> None:
-        asyncio.run(self.task(**params))
+        from .server import build_ui
+
+        build_ui()
+        try:
+            asyncio.run(self.task(**params))
+        except KeyboardInterrupt:
+            pass
 
     async def task(
         self,
@@ -191,21 +189,24 @@ class App:
         host: str = 'localhost',
         port: int = 5000,
     ) -> None:
-        for comp in layout: self.Layout.append(comp)
+        # for comp in layout: self.Layout.append(comp)
 
-        on(CLIENT_CONNECTED)(self.on_client_connected)
-        on(CLIENT_DISCONNECTED)(self.on_client_disconnected)
-        on(LAYOUT_CLEAN)(self.on_layout_clean)
+        from .import server
+        self.server = server.Server(host, port)
 
-        await self.Server.task(host, port)
+        on(server.CLIENT_CONNECTED)(self.on_client_connected)
+        on(server.CLIENT_DISCONNECTED)(self.on_client_disconnected)
 
-    async def on_client_connected(self, sig: CLIENT_CONNECTED) -> None:
+        # on(LAYOUT_CLEAN)(self.on_layout_clean)
+        await self.server.task()
+
+    async def on_client_connected(self, _) -> None:
         logger.info('on_client_connected')
 
-    async def on_client_disconnected(self, sig: CLIENT_DISCONNECTED) -> None:
+    async def on_client_disconnected(self, _) -> None:
         logger.info('on_client_disconnected')
 
-    async def on_layout_clean(self, sig: LAYOUT_CLEAN) -> None:
-        logger.info('on_layout_clean')
-        html, vars = self.Layout.get_current()
-        await send_command(UPDATE_LAYOUT(html=html, vars=vars))
+    # async def on_layout_clean(self, sig: LAYOUT_CLEAN) -> None:
+    #     logger.info('on_layout_clean')
+    #     html, vars = self.Layout.get_current()
+    #     await send_command(UPDATE_LAYOUT(html=html, vars=vars))

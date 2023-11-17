@@ -1,3 +1,4 @@
+import contextvars
 import json
 import logging
 import subprocess
@@ -16,7 +17,6 @@ from starlette.websockets import WebSocketDisconnect
 from .core import COMMAND
 from .core import HTML
 from .core import SIGNAL
-from .core import _conn
 from .core import emit_signal
 from .core import signals_by_name
 from .logging import log_config
@@ -60,6 +60,17 @@ class WSConnection:
         cmd_name = cmd.__class__.__name__
         cmd_params = json.dumps(cmd.__dict__)
         await self.socket.send_text(f'{cmd_name} {cmd_params}')
+
+
+_conn = contextvars.ContextVar('_conn', default=None)
+
+
+def set_connection(conn: WSConnection) -> None:
+    _conn.set(conn)
+
+
+def get_connection() -> WSConnection:
+    return _conn.get()
 
 
 class Server:
@@ -168,7 +179,7 @@ class Server:
         await socket.accept()
 
         conn = WSConnection(socket)
-        _conn.set(conn)
+        set_connection(conn)
 
         try:
             await emit_signal(CLIENT_CONNECTED(id=conn.id))
@@ -183,7 +194,7 @@ class Server:
 
         finally:
             await emit_signal(CLIENT_DISCONNECTED(id=conn.id))
-            _conn.set(None)
+            set_connection(None)
 
 
 def build_ui():
