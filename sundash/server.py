@@ -18,7 +18,7 @@ from .core import COMMAND
 from .core import HTML
 from .core import SIGNAL
 from .core import emit_signal
-from .core import signals_by_name
+from .core import signals
 from .logging import log_config
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,6 @@ class WSConnection:
     @classmethod
     def new_id(cls) -> int:
         cls.__id += 1
-        logger.info(f'ID: {cls.__id}')
         return cls.__id
 
     def __init__(self, socket: WebSocket) -> None:
@@ -51,7 +50,7 @@ class WSConnection:
         message = await self.socket.receive_text()
 
         signal_name, data = message.split(" ", 1)
-        signal_cls = signals_by_name[signal_name]
+        signal_cls = signals[signal_name]
         data = json.loads(data)
 
         await emit_signal(signal_cls(**data))

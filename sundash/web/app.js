@@ -1,9 +1,9 @@
 let socket = new WebSocket("ws:/127.0.0.1:5000/");
 
 let Command = {
-    clear_layout: "clear_layout",
-    append_component: "append_component",
-    update_var: "update_var",
+    CLEAR_LAYOUT: "CLEAR_LAYOUT",
+    UPDATE_LAYOUT: "UPDATE_LAYOUT",
+    UPDATE_VAR: "UPDATE_VAR",
 }
 
 
@@ -12,20 +12,21 @@ socket.onopen = event => {
 }
 
 socket.onmessage = event => {
-    console.log(`[WS] DATA_RECV: ${event.data}`)
     let [name, ...data] = event.data.split(" ")
     data = data.join(" ")
+    console.log(`${name} ${data}`)
+
     if (data != undefined) {
         data = JSON.parse(data)
     }
 
-    if (name == Command.clear_layout) {
+    if (name == Command.CLEAR_LAYOUT) {
         clear_layout()
     }
-    else if (name == Command.append_component) {
-        append_component(data)
+    else if (name == Command.UPDATE_LAYOUT) {
+        update_layout(data)
     }
-    else if (name == Command.update_var) {
+    else if (name == Command.UPDATE_VAR) {
         update_var(data)
     }
     else {
@@ -58,7 +59,7 @@ function clear_layout() {
 }
 
 
-function append_component(data) {
+function update_layout(data) {
     el.innerHTML += data.html
     socket.send('LAYOUT_UPDATED {}')
 

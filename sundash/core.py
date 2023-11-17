@@ -63,12 +63,11 @@ class CLEAR_LAYOUT(COMMAND):
 
 @dataclass
 class UPDATE_LAYOUT(COMMAND):
-    ...
-    # html: HTML
+    html: HTML
     # vars: VarStorage
 
 
-signals_by_name = {c.__name__: c for c in SIGNAL.__subclasses__()}
+signals = {s.__name__: s for s in SIGNAL.__subclasses__()}
 
 
 async def emit_signal(sig: SIGNAL | type[SIGNAL]) -> None:
@@ -84,7 +83,7 @@ from .server import get_connection
 
 async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
     if not isinstance(cmd, COMMAND): cmd = cmd()
-    logger.info(f'{cmd._name} {cmd._data}')
+    logger.info(f'-> {cmd._name} {cmd._data}')
 
     conn = get_connection()
     await conn.send_command(cmd)
@@ -155,24 +154,24 @@ def on(signal_cls: type[SIGNAL]) -> SignalCallback:
 
 # 5. Layout
 
-# class _Layout:
-#     _current: list[Component] = []
-#     _storage: VarStorage = {}
+class Layout(list[Component]):
+    def append(self, item: Component | HTML) -> None:
+        if isinstance(item, str):
+            comp_obj = Component()
+            comp_obj.html = item
+        else:
+            comp_obj = item
+        super().append(comp_obj)
 
-#     @classmethod
-#     def append(cls, comp: Component) -> None:
-#         cls._current.append(comp)
-
-#     @classmethod
-#     def get_current(cls) -> tuple[HTML, VarStorage]:
-#         html = ''.join([comp.html for comp in cls._current])
-#         return html, cls._storage.copy()
+    def get_html(self) -> HTML:
+        return ''.join((c.html for c in self))
 
 
 # 6. App
 
 class App:
-    # Layout = _Layout
+    def __init__(self):
+        self.layout = Layout()
 
     def run(self, **params: dict) -> None:
         from .server import build_ui
@@ -185,28 +184,18 @@ class App:
 
     async def task(
         self,
-        layout: list[Component] = [],
+        layout: list[Component | HTML] = [],
         host: str = 'localhost',
         port: int = 5000,
     ) -> None:
-        # for comp in layout: self.Layout.append(comp)
+        for comp in layout: self.layout.append(comp)
 
-        from .import server
+        from . import server
         self.server = server.Server(host, port)
 
         on(server.CLIENT_CONNECTED)(self.on_client_connected)
-        on(server.CLIENT_DISCONNECTED)(self.on_client_disconnected)
-
-        # on(LAYOUT_CLEAN)(self.on_layout_clean)
         await self.server.task()
 
     async def on_client_connected(self, _) -> None:
-        logger.info('on_client_connected')
-
-    async def on_client_disconnected(self, _) -> None:
-        logger.info('on_client_disconnected')
-
-    # async def on_layout_clean(self, sig: LAYOUT_CLEAN) -> None:
-    #     logger.info('on_layout_clean')
-    #     html, vars = self.Layout.get_current()
-    #     await send_command(UPDATE_LAYOUT(html=html, vars=vars))
+        layout_html = self.layout.get_html()
+        await send_command(UPDATE_LAYOUT(html=layout_html))
