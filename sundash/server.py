@@ -18,20 +18,20 @@ from starlette.websockets import WebSocketDisconnect
 from .core import COMMAND
 from .core import HTML
 from .core import SIGNAL
-from .core import reg_signal
+from .core import _conn
+from .core import emit_signal
+from .core import signals_by_name
 from .logging import log_config
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CLIENT_CONNECTED(SIGNAL):
-    client_id: int
+class CLIENT_CONNECTED(SIGNAL): ...
 
 
 @dataclass
-class CLIENT_DISCONNECTED(SIGNAL):
-    client_id: int
+class CLIENT_DISCONNECTED(SIGNAL): ...
 
 
 _id = 0
@@ -89,17 +89,10 @@ class Server:
             log_level='debug',
             log_config=log_config,
         )
-        # listener_task = self.listener_task()
-
         try:
-            # await run_tasks(server_task, listener_task)
             await run_tasks(server_task)
         finally:
             logger.info('Shutting down server')
-
-    # async def listener_task(cls) -> None:
-    #     while command := await listen_commands():
-    #         logger.info(f'RECV_CMD {command.message}')
 
     async def server_task(self, **config_params: dict) -> None:
         config = uvicorn.Config(app=self, **config_params)
@@ -173,23 +166,28 @@ class Server:
         await socket.accept()
 
         conn = WSConnection(socket)
-        self._connections[conn.id] = conn
+        _conn.set(conn)
 
-        await reg_signal(CLIENT_CONNECTED(client_id=conn.id))
         try:
+            await emit_signal(CLIENT_CONNECTED)
             while True:
                 message = await socket.receive_text()  # noqa
-                logger.info(f'RECV MSG: {message}')
 
-                # signal, data = message.split(" ", 1)
-                # await emit_signal(signal=signal, data=json.loads(data))
+                signal_name, data = message.split(" ", 1)
+                signal_cls = signals_by_name[signal_name]
+                data = json.loads(data)
+
+                await emit_signal(signal_cls(**data))
 
         except WebSocketDisconnect:
             pass
 
+        except Exception as exc:
+            logger.exception(exc)
+
         finally:
-            await reg_signal(CLIENT_DISCONNECTED(client_id=conn.id))
-            self._connections.pop(conn.id)
+            await emit_signal(CLIENT_DISCONNECTED)
+            _conn.set(None)
 
 
 def build_ui():

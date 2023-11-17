@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import functools
 import logging
 import typing as t
@@ -24,8 +25,10 @@ type HTML = str
 
 @dataclass
 class SIGNAL:
+    type Name = str
+
     @property
-    def _name(self) -> str:
+    def _name(self) -> Name:
         return self.__class__.__name__
 
     @property
@@ -69,24 +72,25 @@ class UPDATE_LAYOUT(COMMAND):
     vars: VarStorage
 
 
-_signals: asyncio.Queue[SIGNAL] = asyncio.Queue()
-_commands: asyncio.Queue[COMMAND] = asyncio.Queue()
+signals_by_name = {c.__name__: c for c in SIGNAL.__subclasses__()}
+
+_conn = contextvars.ContextVar('_conn', default=None)
 
 
-async def reg_signal(sig: SIGNAL | type[SIGNAL]) -> None:
+async def emit_signal(sig: SIGNAL | type[SIGNAL]) -> None:
     if not isinstance(sig, SIGNAL): sig = sig()
-    await _signals.put(sig)
-
     logger.info(f'{sig._name} {sig._data}')
+
+    for callback in _callbacks.get(sig._name, set()):
+        await callback(sig)
 
 
 async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
     if not isinstance(cmd, COMMAND): cmd = cmd()
-    await _commands.put(cmd)
+    logger.info(f'{cmd._name} {cmd._data}')
 
-
-async def listen_commands() -> t.Awaitable[t.Generator[COMMAND]]:
-    yield _commands.get()
+    conn = _conn.get()
+    await conn.send_command(cmd)
 
 
 # 3. Components
@@ -118,14 +122,15 @@ type _SignalCallbackRaw = SignalClassCallback | SignalModuleCallback
 type SignalCallback = SignalModuleCallback
 
 
-_callbacks: dict[SIGNAL, set[SignalCallback]] = {}
+_callbacks: dict[SIGNAL.Name, set[SignalCallback]] = {}
 
 
 def subscribe(signal_cls: type[SIGNAL], callback: SignalCallback) -> None:
-    if signal_cls not in _callbacks:
-        _callbacks[signal_cls] = set()
+    sig_name = signal_cls._name
+    if sig_name not in _callbacks:
+        _callbacks[sig_name] = set()
 
-    _callbacks[signal_cls].add(callback)
+    _callbacks[sig_name].add(callback)
 
 
 def on(signal_cls: type[SIGNAL]) -> SignalCallback:
