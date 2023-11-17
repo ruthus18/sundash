@@ -20,18 +20,13 @@ class Var[T]:
 type HTML = str
 
 
-# 2. Signals & Commands
+# 2. Signal Bus & Commands Sending
 
 class _MESSAGE:
     type Name = str
 
-    @property
-    def _name(self) -> Name:
-        return self.__class__.__name__
-
-    @property
-    def _data(self) -> dict:
-        return self.__dict__
+    _name = property(lambda self: self.__class__.__name__)
+    _data = property(lambda self: self.__dict__)
 
 
 @dataclass
@@ -97,24 +92,7 @@ async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
     await conn.send_command(cmd)
 
 
-# 3. Components
-
-class Component:
-    html: HTML = ''
-
-    class Storage: NotImplemented
-
-    # @classmethod
-    # def get_vars(cls) -> tuple[Var.Key]:
-    #     return tuple(cls.Storage.__annotations__.keys())
-
-    @classmethod
-    async def set(self, key: Var.Key, value: Var.Value) -> None:
-        setattr(self, key, value)
-        await send_command(SET_VAR(key=key, value=value))
-
-
-# 4. Signal Callbacks
+# 3. Signal Callbacks
 
 type _SignalClassCallback = t.Callable[[type[object], SIGNAL], None]
 type _SignalModuleCallback = t.Callable[[SIGNAL], None]
@@ -160,7 +138,22 @@ def on(signal_cls: type[SIGNAL]) -> SignalCallback:
     return wrapper
 
 
-# 5. Layout
+# 4. Layout & Components
+
+class Component:
+    html: HTML = ''
+
+    class Storage: NotImplemented
+
+    # @classmethod
+    # def get_vars(cls) -> tuple[Var.Key]:
+    #     return tuple(cls.Storage.__annotations__.keys())
+
+    @classmethod
+    async def set(self, key: Var.Key, value: Var.Value) -> None:
+        setattr(self, key, value)
+        await send_command(SET_VAR(key=key, value=value))
+
 
 class Layout(list[Component]):
     def append(self, item: Component | HTML) -> None:
@@ -175,7 +168,7 @@ class Layout(list[Component]):
         return ''.join((c.html for c in self))
 
 
-# 6. App
+# 5. App
 
 class App:
     def __init__(self):

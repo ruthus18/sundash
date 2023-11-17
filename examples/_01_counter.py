@@ -7,14 +7,13 @@ app = App()
 
 
 class Counter(Component):
-    _btn = '<button id="b-plus">+</button>'
-    html = '<b>{{ count }}</b>' + _btn
+    html = '<b>{{ count }}</b> <button id="b-plus">+</button>'
 
     class Vars:
         count: int = 0
 
     @on(BUTTON_CLICK)
-    async def update(self, sig: BUTTON_CLICK):
+    async def update(self, _):
         await self.set('count', self.Vars.count + 1)
 
 

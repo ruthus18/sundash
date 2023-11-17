@@ -32,10 +32,10 @@
 ```python
     import datetime as dt
 
+    from sundash import EVERY_SECOND
     from sundash import App
     from sundash import Component
-    from sundash import Var
-    from sundash.bus import EVERY_SECOND
+    from sundash import on
     
 
     app = App()
@@ -44,22 +44,22 @@
 
 
     class Clock(Component):
-        html = '<p><b>Time: </b> {{ time }}<p/>'
+        html = '<p><b>Time:</b> {{ time }}<p/>'
 
-        time: Var[str] = now  # you can pass init values (static or procedural)
+        class Vars:
+            # you can pass init values (static or procedural)
+            time: str = now
 
-        @app.on(EVERY_SECOND)  # run callback when user open webpage
+        # run callback when user open webpage
+        @on(EVERY_SECOND)
         async def update(self, _):
             await self.set('time', now())  # live update of value
 
-
-    app.attach_to_layout('<h1>Clock Test</h1>')  # add plain HTML
-    app.attach_to_layout(Clock())                # or own components
-
-    app.run()
+    # add plain HTML or own components
+    app.run(layout=('<h1>Clock Test</h1>', Clock()))
 ```
 
-![clock](docs/examples/_01_clock.png "Clock")
+![clock](docs/examples/_02_clock.png "Clock")
 
 
 ### Development

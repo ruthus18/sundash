@@ -12,7 +12,7 @@ now = lambda: dt.datetime.now().strftime('%H:%M:%S')
 
 
 class Clock(Component):
-    html = '<p><b>Time: </b> {{ time }}<p/>'
+    html = '<p><b>Time:</b> {{ time }}<p/>'
 
     class Vars:
         time: str = now
