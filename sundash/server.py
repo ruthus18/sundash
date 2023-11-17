@@ -1,8 +1,6 @@
-import asyncio
 import json
 import logging
 import subprocess
-import typing as t
 from dataclasses import dataclass
 
 import uvicorn
@@ -27,32 +25,41 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CLIENT_CONNECTED(SIGNAL): ...
+class CLIENT_CONNECTED(SIGNAL):
+    id: int
+
+
 @dataclass
-class CLIENT_DISCONNECTED(SIGNAL): ...
-
-
-_id = 0
-
-
-def new_id() -> int:
-    global _id
-    _id += 1
-    return _id
+class CLIENT_DISCONNECTED(SIGNAL):
+    id: int
 
 
 class WSConnection:
+    __id = 0
+
+    @classmethod
+    def new_id(cls) -> int:
+        cls.__id += 1
+        logger.info(f'ID: {cls.__id}')
+        return cls.__id
+
     def __init__(self, socket: WebSocket) -> None:
-        self.id = new_id()
+        self.id = self.__class__.new_id()
         self.socket = socket
 
-    async def send(self, message: str) -> None:
-        await self.socket.send_text(message)
+    async def receive_signal(self) -> None:
+        message = await self.socket.receive_text()
 
-    async def send_command(self, command: COMMAND) -> None:
-        cmd_name = command.__class__.__name__
-        cmd_params = json.dumps(command.__dict__)
-        await self.send(f'{cmd_name} {cmd_params}')
+        signal_name, data = message.split(" ", 1)
+        signal_cls = signals_by_name[signal_name]
+        data = json.loads(data)
+
+        await emit_signal(signal_cls(**data))
+
+    async def send_command(self, cmd: COMMAND) -> None:
+        cmd_name = cmd.__class__.__name__
+        cmd_params = json.dumps(cmd.__dict__)
+        await self.socket.send_text(f'{cmd_name} {cmd_params}')
 
 
 class Server:
@@ -81,21 +88,18 @@ class Server:
     async def task(self) -> None:
         logger.info(f'Starting server at http://{self.host}:{self.port}/')
 
-        server_task = self.server_task(
+        config = uvicorn.Config(
+            app=self,
             host=self.host,
             port=self.port,
             log_level='debug',
             log_config=log_config,
         )
+        server = self._ASGIServer(config=config)
         try:
-            await run_tasks(server_task)
+            await server.serve()
         finally:
             logger.info('Shutting down server')
-
-    async def server_task(self, **config_params: dict) -> None:
-        config = uvicorn.Config(app=self, **config_params)
-        server = self._ASGIServer(config=config)
-        await server.serve()
 
     async def __call__(
         self, scope: Scope, receive: Receive, send: Send
@@ -167,15 +171,9 @@ class Server:
         _conn.set(conn)
 
         try:
-            await emit_signal(CLIENT_CONNECTED)
+            await emit_signal(CLIENT_CONNECTED(id=conn.id))
             while True:
-                message = await socket.receive_text()  # noqa
-
-                signal_name, data = message.split(" ", 1)
-                signal_cls = signals_by_name[signal_name]
-                data = json.loads(data)
-
-                await emit_signal(signal_cls(**data))
+                await conn.receive_signal()
 
         except WebSocketDisconnect:
             pass
@@ -184,7 +182,7 @@ class Server:
             logger.exception(exc)
 
         finally:
-            await emit_signal(CLIENT_DISCONNECTED)
+            await emit_signal(CLIENT_DISCONNECTED(id=conn.id))
             _conn.set(None)
 
 
@@ -192,17 +190,3 @@ def build_ui():
     logger.info('Building web UI...')
     # FIXME control output and redirect to logger
     subprocess.run(['npm', 'run', 'build'])
-
-
-async def run_tasks(*tasks: t.Iterable[t.Awaitable]) -> None:
-    await asyncio.wait(
-        [asyncio.create_task(t) for t in tasks],
-        return_when=asyncio.FIRST_COMPLETED,
-    )
-
-
-if __name__ == '__main__':
-    server = Server()
-
-    build_ui()
-    asyncio.run(server.task())
