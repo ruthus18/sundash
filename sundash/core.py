@@ -157,6 +157,8 @@ def on(signal_cls: type[SIGNAL]) -> SignalCallback:
 
 # 5. Server & Layout
 
+from .server import CLIENT_CONNECTED
+from .server import CLIENT_DISCONNECTED
 from .server import Server
 
 
@@ -191,18 +193,19 @@ class App:
     ) -> None:
         for comp in layout: self.Layout.append(comp)
 
-        # on(CLIENT_CONNECTED)(self.on_client_connected)
-        # on(CLIENT_DISCONNECTED)(self.on_client_disconnected)
-        # on(LAYOUT_CLEAN)(self.on_layout_clean)
+        on(CLIENT_CONNECTED)(self.on_client_connected)
+        on(CLIENT_DISCONNECTED)(self.on_client_disconnected)
+        on(LAYOUT_CLEAN)(self.on_layout_clean)
 
         await self.Server.task(host, port)
 
-    # async def on_client_connected(self, sig: CLIENT_CONNECTED) -> None:
-    #     ...
+    async def on_client_connected(self, sig: CLIENT_CONNECTED) -> None:
+        logger.info('on_client_connected')
 
-    # async def on_client_disconnected(self, sig: CLIENT_DISCONNECTED) -> None:
-    #     ...
+    async def on_client_disconnected(self, sig: CLIENT_DISCONNECTED) -> None:
+        logger.info('on_client_disconnected')
 
-    # async def on_layout_clean(self, sig: LAYOUT_CLEAN) -> None:
-    #     html, vars = self.Layout.get_current()
-    #     await send_command(UPDATE_LAYOUT(html=html, vars=vars))
+    async def on_layout_clean(self, sig: LAYOUT_CLEAN) -> None:
+        logger.info('on_layout_clean')
+        html, vars = self.Layout.get_current()
+        await send_command(UPDATE_LAYOUT(html=html, vars=vars))

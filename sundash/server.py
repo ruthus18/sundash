@@ -28,8 +28,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CLIENT_CONNECTED(SIGNAL): ...
-
-
 @dataclass
 class CLIENT_DISCONNECTED(SIGNAL): ...
 
