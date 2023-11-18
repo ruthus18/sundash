@@ -31,7 +31,8 @@ class _MESSAGE(ABC):
 
 
 @dataclass
-class SIGNAL(_MESSAGE): ...
+class SIGNAL(_MESSAGE):
+    type T = type[SIGNAL]
 
 
 @dataclass
@@ -52,7 +53,8 @@ class EVERY_SECOND(SIGNAL): ...
 
 
 @dataclass
-class COMMAND(_MESSAGE): ...
+class COMMAND(_MESSAGE):
+    type T = type[COMMAND]
 
 
 @dataclass
@@ -74,7 +76,7 @@ class UPDATE_LAYOUT(COMMAND):
 signals = {s.__name__: s for s in SIGNAL.__subclasses__()}
 
 
-async def emit_signal(sig: SIGNAL | type[SIGNAL]) -> None:
+async def emit_signal(sig: SIGNAL | SIGNAL.T) -> None:
     if not isinstance(sig, SIGNAL): sig = sig()
     logger.info(f'{sig._name} {sig._data}')
 
@@ -108,7 +110,7 @@ type Callback = FunctionCallback
 _callbacks: dict[SIGNAL.Name, set[Callback]] = {}
 
 
-def subscribe(signal_cls: type[SIGNAL], callback: Callback) -> None:
+def subscribe(signal_cls: SIGNAL.T, callback: Callback) -> None:
     sig_name = signal_cls.__name__
     if sig_name not in _callbacks:
         _callbacks[sig_name] = set()
@@ -116,7 +118,7 @@ def subscribe(signal_cls: type[SIGNAL], callback: Callback) -> None:
     _callbacks[sig_name].add(callback)
 
 
-def unsubscribe(signal_cls: type[SIGNAL], callback: Callback) -> None:
+def unsubscribe(signal_cls: SIGNAL.T, callback: Callback) -> None:
     sig_name = signal_cls.__name__
     _callbacks[sig_name].remove(callback)
 
@@ -136,7 +138,7 @@ def _get_f_cls_name(func: t.Callable) -> str | None:
     return name[0] if len(name) == 2 else None
 
 
-def on(signal_cls: type[SIGNAL]) -> AnyCallback:
+def on(signal_cls: SIGNAL.T) -> AnyCallback:
     def wrapper(func: AnyCallback) -> AnyCallback:
         self = _get_f_self(func)
         cls_name = _get_f_cls_name(func)
@@ -170,7 +172,7 @@ class Component:
     @dataclass
     class Vars: ...
 
-    _callbacks: set[tuple[type[SIGNAL], str, str]] = set()
+    _callbacks: set[tuple[SIGNAL.T, str, str]] = set()
 
     def __init__(self):
         if not is_dataclass(self.Vars):
@@ -181,24 +183,24 @@ class Component:
 
     @classmethod
     def schedule_callback(
-        cls, signal_cls: type[SIGNAL], cls_name: str, func_name: str
+        cls, signal_cls: SIGNAL.T, cls_name: str, func_name: str
     ) -> None:
         cls._callbacks.add((signal_cls, cls_name, func_name))
 
-    def subscribe_callbacks(self) -> None:
+    def callbacks_map(self) -> t.Generator[tuple[SIGNAL.T, Callback]]:
         cls = self.__class__
         for signal_cls, cls_name, func_name in self.__class__._callbacks:
             if cls.__name__ != cls_name: continue
 
             callback = getattr(self, func_name)
+            yield signal_cls, callback
+
+    def subscribe_callbacks(self) -> None:
+        for signal_cls, callback in self.callbacks_map():
             subscribe(signal_cls, callback)
 
     def unsubscribe_callbacks(self) -> None:
-        cls = self.__class__
-        for signal_cls, cls_name, func_name in self.__class__._callbacks:
-            if cls.__name__ != cls_name: continue
-
-            callback = getattr(self, func_name)
+        for signal_cls, callback in self.callbacks_map():
             unsubscribe(signal_cls, callback)
 
     async def set(self, key: Var.Key, value: Var.Value) -> None:
@@ -247,7 +249,9 @@ class Layout(list[type[Component]]):
 
 # 5. App
 
-from . import server
+from .server import CLIENT_CONNECTED
+from .server import CLIENT_DISCONNECTED
+from .server import Server
 
 
 class App:
@@ -264,10 +268,10 @@ class App:
         self.layout = Layout()
         for comp in layout: self.layout.append(comp)
 
-        on(server.CLIENT_CONNECTED)(self.open_layout_session)
-        on(server.CLIENT_DISCONNECTED)(self.close_layout_session)
+        on(CLIENT_CONNECTED)(self.open_layout_session)
+        on(CLIENT_DISCONNECTED)(self.close_layout_session)
 
-        self.server = server.Server()
+        self.server = Server()
         await self.server.task()
 
     async def open_layout_session(self, _) -> None:
@@ -278,6 +282,6 @@ class App:
         self.layout.close_session()
 
 
-@on(server.CLIENT_CONNECTED)
-async def log_something(sig: server.CLIENT_CONNECTED) -> None:
+@on(CLIENT_CONNECTED)
+async def log_something(sig: CLIENT_CONNECTED) -> None:
     logger.info('Я мясистая улиточка со шпинатом и сыром')
