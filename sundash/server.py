@@ -96,6 +96,7 @@ class Server:
         self._connections: dict[int: WSConnection] = {}
 
     async def task(self) -> None:
+        build_ui()
         logger.info(f'Starting server at http://{self.host}:{self.port}/')
 
         config = uvicorn.Config(

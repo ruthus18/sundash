@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import logging
 import typing as t
 from dataclasses import dataclass
@@ -94,14 +93,14 @@ async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
 
 # 3. Signal Callbacks
 
-type _SignalClassCallback = t.Callable[[type[object], SIGNAL], None]
-type _SignalModuleCallback = t.Callable[[SIGNAL], None]
+type _SignalClsCallback = t.Callable[[type[object], SIGNAL], None]
+type _SignalFuncCallback = t.Callable[[SIGNAL], None]
 
-type SignalClassCallback = t.Awaitable[_SignalClassCallback]
-type SignalModuleCallback = t.Awaitable[_SignalModuleCallback]
+type SignalClsCallback = t.Awaitable[_SignalClsCallback]
+type SignalFuncCallback = t.Awaitable[_SignalFuncCallback]
 
-type _SignalCallbackRaw = SignalClassCallback | SignalModuleCallback
-type SignalCallback = SignalModuleCallback
+type AnySignalCallback = SignalFuncCallback | SignalClsCallback
+type SignalCallback = SignalFuncCallback
 
 
 _callbacks: dict[SIGNAL.Name, set[SignalCallback]] = {}
@@ -115,24 +114,18 @@ def subscribe(signal_cls: type[SIGNAL], callback: SignalCallback) -> None:
     _callbacks[sig_name].add(callback)
 
 
-def on(signal_cls: type[SIGNAL]) -> SignalCallback:
-    def wrapper(func: _SignalCallbackRaw) -> SignalCallback:
+def on(signal_cls: type[SIGNAL]) -> AnySignalCallback:
+    def wrapper(func: AnySignalCallback) -> AnySignalCallback:
 
-        callback: SignalCallback = None
-        try:
-            cls = callback.__self__
-        except AttributeError:
-            is_comp_callback = False
-        else:
-            is_comp_callback = True
+        # match func.__qualname__.split('.'):
+        #     case cls_name, func_name:
+        #         import ipdb; ipdb.set_trace()
+        #         cls = globals()[cls_name]
+        #         cls.__callbacks = func_name
 
-        if is_comp_callback:
-            callback = lambda sig: func(cls, sig)
-        else:
-            callback = lambda sig: func(sig)
+        #     case func_name:
+        #         subscribe(signal_cls, func)
 
-        callback = functools.wraps(func)(callback)
-        subscribe(signal_cls, callback)
         return func
 
     return wrapper
@@ -149,7 +142,7 @@ class Component:
     # def get_vars(cls) -> tuple[Var.Key]:
     #     return tuple(cls.Storage.__annotations__.keys())
 
-    @classmethod
+    # @classmethod
     async def set(self, key: Var.Key, value: Var.Value) -> None:
         setattr(self, key, value)
         await send_command(SET_VAR(key=key, value=value))
@@ -171,13 +164,8 @@ class Layout(list[Component]):
 # 5. App
 
 class App:
-    def __init__(self):
-        self.layout = Layout()
 
     def run(self, **params: dict) -> None:
-        from .server import build_ui
-
-        build_ui()
         try:
             asyncio.run(self.task(**params))
         except KeyboardInterrupt:
@@ -187,12 +175,12 @@ class App:
         self,
         layout: t.Iterable[Component | HTML] = [],
     ) -> None:
+        self.layout = Layout()
         for comp in layout: self.layout.append(comp)
 
         from . import server
-        self.server = server.Server()
-
         on(server.CLIENT_CONNECTED)(self.on_client_connected)
+        self.server = server.Server()
         await self.server.task()
 
     async def on_client_connected(self, _) -> None:
