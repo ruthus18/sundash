@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import typing as t
+from abc import ABC
 from dataclasses import dataclass
+from dataclasses import is_dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +17,13 @@ class Var[T]:
     type Value = T
 
 
-# type VarStorage = dict[Var.Key, Var.Value]
+type VarStorage = dict[Var.Key, Var.Value]
 type HTML = str
 
 
 # 2. Signal Bus & Commands Sending
 
-class _MESSAGE:
+class _MESSAGE(ABC):
     type Name = str
 
     _name = property(lambda self: self.__class__.__name__)
@@ -66,7 +68,7 @@ class CLEAR_LAYOUT(COMMAND): ...
 @dataclass
 class UPDATE_LAYOUT(COMMAND):
     html: HTML
-    # vars: VarStorage
+    vars: VarStorage
 
 
 signals = {s.__name__: s for s in SIGNAL.__subclasses__()}
@@ -149,6 +151,7 @@ def on(signal_cls: type[SIGNAL]) -> AnyCallback:
 
         elif not self and cls_name:
             # `on` called for class function -> not valid callback...
+            # only valid in component interface
             Component.schedule_callback(signal_cls, cls_name, func.__name__)
 
         elif self and not cls_name:
@@ -164,9 +167,17 @@ def on(signal_cls: type[SIGNAL]) -> AnyCallback:
 class Component:
     html: HTML = ''
 
-    class Vars: NotImplemented
+    @dataclass
+    class Vars: ...
 
     _callbacks: set[tuple[type[SIGNAL], str, str]] = set()
+
+    def __init__(self):
+        if not is_dataclass(self.Vars):
+            raise RuntimeError
+
+        # TODO: init procedural values
+        self.vars: dict = self.Vars().__dict__
 
     @classmethod
     def schedule_callback(
@@ -190,13 +201,8 @@ class Component:
             callback = getattr(self, func_name)
             unsubscribe(signal_cls, callback)
 
-    # @classmethod
-    # def get_vars(cls) -> tuple[Var.Key]:
-    #     return tuple(cls.Storage.__annotations__.keys())
-
-    # @classmethod
     async def set(self, key: Var.Key, value: Var.Value) -> None:
-        setattr(self, key, value)
+        # TODO if not getattr(self.Vars, key, value): ...
         await send_command(SET_VAR(key=key, value=value))
 
 
@@ -214,22 +220,27 @@ class Layout(list[type[Component]]):
 
         super().append(comp)
 
-    def open_session(self) -> HTML:
+    def open_session(self) -> tuple[HTML, VarStorage]:
         layout = []
         for comp_cls in self:
             comp = comp_cls()
             comp.subscribe_callbacks()
             layout.append(comp)
 
+        data = {}
+        for comp in layout:
+            data.update(**comp.vars)
+
+        html = ''.join((c.html for c in layout))
+
         id = get_connection().id
         self._sessions[id] = layout
-
-        return ''.join((c.html for c in layout))
+        return html, data
 
     def close_session(self) -> None:
         id = get_connection().id
         for comp in self._sessions[id]:
-            comp.destroy()
+            comp.unsubscribe_callbacks()
 
         self._sessions.pop(id)
 
@@ -260,8 +271,8 @@ class App:
         await self.server.task()
 
     async def open_layout_session(self, _) -> None:
-        layout_html = self.layout.open_session()
-        await send_command(UPDATE_LAYOUT(html=layout_html))
+        html, data = self.layout.open_session()
+        await send_command(UPDATE_LAYOUT(html=html, vars=data))
 
     async def close_layout_session(self, _) -> None:
         self.layout.close_session()

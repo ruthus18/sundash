@@ -1,4 +1,5 @@
 import datetime as dt
+from dataclasses import dataclass
 
 from sundash.core import EVERY_SECOND
 from sundash.core import App
@@ -14,6 +15,7 @@ now = lambda: dt.datetime.now().strftime('%H:%M:%S')
 class Clock(Component):
     html = '<p><b>Time:</b> {{ time }}<p/>'
 
+    @dataclass
     class Vars:
         time: str = now
 

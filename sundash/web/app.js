@@ -54,16 +54,25 @@ const el = document.getElementById("app")
 
 
 function clear_layout() {
-    el.innerHTML = ""
+    el.innerHTML = ''
     socket.send('LAYOUT_CLEAN {}')
 }
 
 
 function update_layout(data) {
-    el.innerHTML += data.html
+    el.innerHTML = ''
+    el.__html = data.html
+    el.__vars = data.vars
+
+    let response_html = el.__html
+    for (let key in el.__vars) {
+        let value = el.__vars[key]
+        response_html = response_html.replace(`{{ ${key} }}`, value)
+    }
+
+    el.innerHTML = response_html
     socket.send('LAYOUT_UPDATED {}')
 
-    el._orig_html = el.innerHTML
 }
 
 

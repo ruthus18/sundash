@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from sundash.core import BUTTON_CLICK
 from sundash.core import App
 from sundash.core import Component
@@ -9,6 +11,7 @@ app = App()
 class Counter(Component):
     html = '<b>{{ count }}</b> <button id="b-plus">+</button>'
 
+    @dataclass
     class Vars:
         count: int = 0
 
