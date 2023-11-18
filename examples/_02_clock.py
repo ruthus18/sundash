@@ -22,4 +22,4 @@ class Clock(Component):
         await self.set('time', now())
 
 
-app.run(layout=('<h1>Clock</h1>', Clock()))
+app.run(layout=('<h1>Clock</h1>', Clock))

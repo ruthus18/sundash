@@ -93,20 +93,20 @@ async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
 
 # 3. Signal Callbacks
 
-type _SignalClsCallback = t.Callable[[type[object], SIGNAL], None]
-type _SignalFuncCallback = t.Callable[[SIGNAL], None]
+type _FunctionCallback = t.Callable[[object, SIGNAL], None]
+type _ClassCallback = t.Callable[[SIGNAL], None]
 
-type SignalClsCallback = t.Awaitable[_SignalClsCallback]
-type SignalFuncCallback = t.Awaitable[_SignalFuncCallback]
+type ClassCallback = t.Awaitable[_ClassCallback]
+type FunctionCallback = t.Awaitable[_FunctionCallback]
 
-type AnySignalCallback = SignalFuncCallback | SignalClsCallback
-type SignalCallback = SignalFuncCallback
-
-
-_callbacks: dict[SIGNAL.Name, set[SignalCallback]] = {}
+type AnyCallback = FunctionCallback | ClassCallback
+type Callback = FunctionCallback
 
 
-def subscribe(signal_cls: type[SIGNAL], callback: SignalCallback) -> None:
+_callbacks: dict[SIGNAL.Name, set[Callback]] = {}
+
+
+def subscribe(signal_cls: type[SIGNAL], callback: Callback) -> None:
     sig_name = signal_cls.__name__
     if sig_name not in _callbacks:
         _callbacks[sig_name] = set()
@@ -114,17 +114,45 @@ def subscribe(signal_cls: type[SIGNAL], callback: SignalCallback) -> None:
     _callbacks[sig_name].add(callback)
 
 
-def on(signal_cls: type[SIGNAL]) -> AnySignalCallback:
-    def wrapper(func: AnySignalCallback) -> AnySignalCallback:
+def unsubscribe(signal_cls: type[SIGNAL], callback: Callback) -> None:
+    sig_name = signal_cls.__name__
+    _callbacks[sig_name].remove(callback)
 
-        # match func.__qualname__.split('.'):
-        #     case cls_name, func_name:
-        #         import ipdb; ipdb.set_trace()
-        #         cls = globals()[cls_name]
-        #         cls.__callbacks = func_name
 
-        #     case func_name:
-        #         subscribe(signal_cls, func)
+def _get_f_self(func: t.Callable) -> object | None:
+    try:
+        return func.__self__
+    except AttributeError:
+        return None
+
+
+def _get_f_cls_name(func: t.Callable) -> str | None:
+    name = func.__qualname__.split('.')
+    if len(name) > 2:
+        raise RuntimeError
+
+    return name[0] if len(name) == 2 else None
+
+
+def on(signal_cls: type[SIGNAL]) -> AnyCallback:
+    def wrapper(func: AnyCallback) -> AnyCallback:
+        self = _get_f_self(func)
+        cls_name = _get_f_cls_name(func)
+
+        if self and cls_name:
+            # `on` called for `self.method` -> valid callback
+            subscribe(signal_cls, func)
+
+        elif not self and not cls_name:
+            # `on` called for module function -> valid callback
+            subscribe(signal_cls, func)
+
+        elif not self and cls_name:
+            # `on` called for class function -> not valid callback...
+            Component.schedule_callback(signal_cls, cls_name, func.__name__)
+
+        elif self and not cls_name:
+            raise RuntimeError  # no way...
 
         return func
 
@@ -136,7 +164,31 @@ def on(signal_cls: type[SIGNAL]) -> AnySignalCallback:
 class Component:
     html: HTML = ''
 
-    class Storage: NotImplemented
+    class Vars: NotImplemented
+
+    _callbacks: set[tuple[type[SIGNAL], str, str]] = set()
+
+    @classmethod
+    def schedule_callback(
+        cls, signal_cls: type[SIGNAL], cls_name: str, func_name: str
+    ) -> None:
+        cls._callbacks.add((signal_cls, cls_name, func_name))
+
+    def subscribe_callbacks(self) -> None:
+        cls = self.__class__
+        for signal_cls, cls_name, func_name in self.__class__._callbacks:
+            if cls.__name__ != cls_name: continue
+
+            callback = getattr(self, func_name)
+            subscribe(signal_cls, callback)
+
+    def unsubscribe_callbacks(self) -> None:
+        cls = self.__class__
+        for signal_cls, cls_name, func_name in self.__class__._callbacks:
+            if cls.__name__ != cls_name: continue
+
+            callback = getattr(self, func_name)
+            unsubscribe(signal_cls, callback)
 
     # @classmethod
     # def get_vars(cls) -> tuple[Var.Key]:
@@ -148,23 +200,46 @@ class Component:
         await send_command(SET_VAR(key=key, value=value))
 
 
-class Layout(list[Component]):
-    def append(self, item: Component | HTML) -> None:
-        if isinstance(item, str):
-            comp_obj = Component()
-            comp_obj.html = item
-        else:
-            comp_obj = item
-        super().append(comp_obj)
+class Layout(list[type[Component]]):
+    _sessions: dict[int, list[Component]] = {}
 
-    def get_html(self) -> HTML:
-        return ''.join((c.html for c in self))
+    def append(self, item: type[Component] | HTML) -> None:
+        if isinstance(item, str):
+            class HTMLComponent(Component):
+                html = item
+
+            comp = HTMLComponent
+        else:
+            comp = item
+
+        super().append(comp)
+
+    def open_session(self) -> HTML:
+        layout = []
+        for comp_cls in self:
+            comp = comp_cls()
+            comp.subscribe_callbacks()
+            layout.append(comp)
+
+        id = get_connection().id
+        self._sessions[id] = layout
+
+        return ''.join((c.html for c in layout))
+
+    def close_session(self) -> None:
+        id = get_connection().id
+        for comp in self._sessions[id]:
+            comp.destroy()
+
+        self._sessions.pop(id)
 
 
 # 5. App
 
-class App:
+from . import server
 
+
+class App:
     def run(self, **params: dict) -> None:
         try:
             asyncio.run(self.task(**params))
@@ -178,11 +253,20 @@ class App:
         self.layout = Layout()
         for comp in layout: self.layout.append(comp)
 
-        from . import server
-        on(server.CLIENT_CONNECTED)(self.on_client_connected)
+        on(server.CLIENT_CONNECTED)(self.open_layout_session)
+        on(server.CLIENT_DISCONNECTED)(self.close_layout_session)
+
         self.server = server.Server()
         await self.server.task()
 
-    async def on_client_connected(self, _) -> None:
-        layout_html = self.layout.get_html()
+    async def open_layout_session(self, _) -> None:
+        layout_html = self.layout.open_session()
         await send_command(UPDATE_LAYOUT(html=layout_html))
+
+    async def close_layout_session(self, _) -> None:
+        self.layout.close_session()
+
+
+@on(server.CLIENT_CONNECTED)
+async def log_something(sig: server.CLIENT_CONNECTED) -> None:
+    logger.info('Я мясистая улиточка со шпинатом и сыром')
