@@ -30,11 +30,6 @@ class SIGNAL(_MESSAGE):
 
 
 @dataclass
-class BUTTON_CLICK(SIGNAL):
-    button_id: str
-
-
-@dataclass
 class EVERY_SECOND(SIGNAL): ...
 
 
@@ -48,7 +43,9 @@ get_signals_map = lambda: {s.__name__: s for s in SIGNAL.__subclasses__()}
 
 async def emit_signal(sig: SIGNAL | SIGNAL.T) -> None:
     if not isinstance(sig, SIGNAL): sig = sig()
-    logger.info(f'{sig._name} {sig._data}')
+
+    conn = get_connection()
+    logger.info(f'[{conn.id}] -> {sig._name}  {sig._data}')
 
     for callback in _callbacks.get(sig._name, set()):
         await callback(sig)
@@ -59,9 +56,10 @@ from .server import get_connection
 
 async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
     if not isinstance(cmd, COMMAND): cmd = cmd()
-    logger.info(f'-> {cmd._name} {cmd._data}')
 
     conn = get_connection()
+    logger.info(f'[{conn.id}] <- {cmd._name}  {cmd._data}')
+
     await conn.send_command(cmd)
 
 

@@ -25,10 +25,6 @@ type VarStorage = dict[Var.Key, Var.Value]
 
 
 @dataclass
-class CLEAR_LAYOUT(COMMAND): ...
-
-
-@dataclass
 class LAYOUT_UPDATED(SIGNAL): ...
 
 
@@ -41,15 +37,24 @@ class VAR_SET(SIGNAL): ...
 
 
 @dataclass
-class SET_VAR(COMMAND):
-    key: Var.Key
-    value: Var.Value
+class BUTTON_CLICK(SIGNAL):
+    button_id: str
 
 
 @dataclass
 class UPDATE_LAYOUT(COMMAND):
     html: HTML
     vars: VarStorage
+
+
+@dataclass
+class CLEAR_LAYOUT(COMMAND): ...
+
+
+@dataclass
+class SET_VAR(COMMAND):
+    key: Var.Key
+    value: Var.Value
 
 
 class Component:

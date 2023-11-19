@@ -25,13 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CLIENT_CONNECTED(SIGNAL):
-    id: int
+class CLIENT_CONNECTED(SIGNAL): ...
 
 
 @dataclass
-class CLIENT_DISCONNECTED(SIGNAL):
-    id: int
+class CLIENT_DISCONNECTED(SIGNAL): ...
 
 
 class WSConnection:
@@ -182,7 +180,7 @@ class Server:
         set_connection(conn)
 
         try:
-            await emit_signal(CLIENT_CONNECTED(id=conn.id))
+            await emit_signal(CLIENT_CONNECTED)
             while True:
                 await conn.receive_signal()
 
@@ -193,7 +191,7 @@ class Server:
             logger.exception(exc)
 
         finally:
-            await emit_signal(CLIENT_DISCONNECTED(id=conn.id))
+            await emit_signal(CLIENT_DISCONNECTED)
             set_connection(None)
 
 

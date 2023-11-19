@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from sundash import App
 from sundash import Component
 from sundash import on
-from sundash.core import BUTTON_CLICK
+from sundash.layout import BUTTON_CLICK
 
 app = App()
 
