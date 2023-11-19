@@ -1,3 +1,4 @@
+import functools
 import typing as t
 from dataclasses import dataclass
 from dataclasses import is_dataclass
@@ -5,6 +6,7 @@ from dataclasses import is_dataclass
 from .core import COMMAND
 from .core import HTML
 from .core import SIGNAL
+from .core import Callback
 from .core import on
 from .core import send_command
 from .core import subscribe
@@ -64,6 +66,16 @@ class Component:
 
         # TODO: init procedural values
         self.vars: dict = self.Vars().__dict__
+        self.conn_id = get_connection().id
+
+    def callback_wrapper(self, callback: Callback) -> Callback:
+        async def wrapper(sig: SIGNAL):
+            conn_id = get_connection().id
+            if conn_id != self.conn_id:
+                return
+            await callback(sig)
+
+        return functools.wraps(callback)(wrapper)
 
     @classmethod
     def schedule_callback(
@@ -81,7 +93,7 @@ class Component:
 
     def subscribe_callbacks(self) -> None:
         for signal_cls, callback in self.callbacks_map():
-            subscribe(signal_cls, callback)
+            subscribe(signal_cls, self.callback_wrapper(callback))
 
     def unsubscribe_callbacks(self) -> None:
         for signal_cls, callback in self.callbacks_map():
