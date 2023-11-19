@@ -17,7 +17,7 @@ class Counter(Component):
 
     @on(BUTTON_CLICK)
     async def update(self, _):
-        await self.set('count', self.Vars.count + 1)
+        await self.set('count', self.vars['count'] + 1)
 
 
 app.run(layout=('<h1>🧮 Counter</h1>', Counter))

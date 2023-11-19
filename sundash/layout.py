@@ -35,6 +35,10 @@ class LAYOUT_CLEAN(SIGNAL): ...
 
 
 @dataclass
+class VAR_SET(SIGNAL): ...
+
+
+@dataclass
 class SET_VAR(COMMAND):
     key: Var.Key
     value: Var.Value
@@ -84,7 +88,7 @@ class Component:
             unsubscribe(signal_cls, callback)
 
     async def set(self, key: Var.Key, value: Var.Value) -> None:
-        # TODO if not getattr(self.Vars, key, value): ...
+        self.vars[key] = value
         await send_command(SET_VAR(key=key, value=value))
 
 
