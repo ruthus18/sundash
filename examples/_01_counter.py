@@ -37,4 +37,4 @@ class Counter(Component):
         await self.set('count', self.vars['count'])
 
 
-app.run(layout=('<h1>🧮 Counter</h1>', Counter))
+run = lambda: app.run(layout=('<h1>🧮 Counter</h1>', Counter))
