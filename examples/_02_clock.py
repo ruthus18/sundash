@@ -12,6 +12,7 @@ app = App()
 now = lambda: dt.datetime.now().strftime('%H:%M:%S')
 
 
+# FIXME: not working, need to implement dynamic vars and scheduler
 class Clock(Component):
     html = '<p><b>Time:</b> {{ time }}<p/>'
 
