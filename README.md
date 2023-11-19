@@ -68,3 +68,4 @@
 * Install JS dependencies: `npm install`
 * Install Python dependencies: `poetry install --with=dev`
 * Run local linters: `poe q`
+* Publish package: `poetry publish --build`
