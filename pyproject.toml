@@ -54,3 +54,4 @@ force_single_line = true
 _isort = "isort --overwrite-in-place ."
 _flake8 = "flake8p ."
 q = ["_isort", "_flake8"]  # q for quality :)
+pub = "poetry publish --build"
