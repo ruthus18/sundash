@@ -1,10 +1,6 @@
 ### [TODO]
 
-* user sessions
-* component interface (refactor mad tech)
-* schemas for signals and commands (intranet-bus like, but just TypeDict)
 * find the format for communication description (need to draw...)
-* layout controller
 * define sundash modules (`sundash.ext._base`)
 * theme customization, frontend folder management, adaptive layout out-of-box
 
