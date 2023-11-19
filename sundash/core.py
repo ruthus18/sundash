@@ -43,10 +43,6 @@ class COMMAND(_MESSAGE):
     type T = type[COMMAND]
 
 
-@dataclass
-class CLEAR_LAYOUT(COMMAND): ...
-
-
 get_signals_map = lambda: {s.__name__: s for s in SIGNAL.__subclasses__()}
 
 

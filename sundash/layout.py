@@ -5,7 +5,6 @@ from dataclasses import is_dataclass
 from .core import COMMAND
 from .core import HTML
 from .core import SIGNAL
-from .core import Callback
 from .core import on
 from .core import send_command
 from .core import subscribe
@@ -21,6 +20,10 @@ class Var[T]:
 
 
 type VarStorage = dict[Var.Key, Var.Value]
+
+
+@dataclass
+class CLEAR_LAYOUT(COMMAND): ...
 
 
 @dataclass
@@ -64,7 +67,7 @@ class Component:
     ) -> None:
         cls._callbacks.add((signal_cls, cls_name, func_name))
 
-    def callbacks_map(self) -> t.Generator[tuple[SIGNAL.T, Callback], None, None]:
+    def callbacks_map(self) -> t.Generator:
         cls = self.__class__
         for signal_cls, cls_name, func_name in self.__class__._callbacks:
             if cls.__name__ != cls_name: continue

@@ -20,4 +20,4 @@ class Counter(Component):
         await self.set('count', self.Vars.count + 1)
 
 
-app.run(layout=('<h1>Counter</h1>', Counter))
+app.run(layout=('<h1>🧮 Counter</h1>', Counter))
