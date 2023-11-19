@@ -9,7 +9,6 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "npm": "^10.2.3",
     "parcel": "^2.9.3"
   }
 }
