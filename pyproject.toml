@@ -1,9 +1,12 @@
 [tool.poetry]
 name = "sundash"
-version = "0.0.2"
+version = "0.0.3"
 description = "Python & JS micro framework for realtime web UI applications"
 authors = ["Danil Tryapchev <ruthus18@gmail.com>"]
 readme = "README.md"
+license = "MIT"
+repository = "https://github.com/ruthus18/sundash"
+keywords = ["backend", "frontend", "server", "client", "ws", "framework"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
