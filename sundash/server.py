@@ -18,7 +18,7 @@ from .core import COMMAND
 from .core import HTML
 from .core import SIGNAL
 from .core import emit_signal
-from .core import signals
+from .core import get_signals_map
 from .logging import log_config
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class WSConnection:
         message = await self.socket.receive_text()
 
         signal_name, data = message.split(" ", 1)
-        signal_cls = signals[signal_name]
+        signal_cls = get_signals_map()[signal_name]
         data = json.loads(data)
 
         await emit_signal(signal_cls(**data))

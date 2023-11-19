@@ -7,11 +7,13 @@ if int(os.getenv('SUNDASH_SETUP_LOGGING', 1)):
 
 
 from .core import App
-from .core import Component
-from .core import Var
+from .core import on
+from .layout import Component
+from .layout import Var
 
 __all__ = [
     'App',
+    'on',
     'Component',
     'Var',
 ]
