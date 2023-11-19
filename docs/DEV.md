@@ -1,5 +1,7 @@
 ### [TODO]
 
+* fix bug with multiplayer callback collision
+* прокачать петушковый интерфейс присваивания динамичных переменныых
 * find the format for communication description (need to draw...)
 * define sundash modules (`sundash.ext._base`)
 * theme customization, frontend folder management, adaptive layout out-of-box

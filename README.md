@@ -3,8 +3,8 @@
 **Python & JS micro framework for realtime web UI applications**
 
 * **ASGI-based** -- minimal 3rd party dependencies and clean core part
-* **Flexible and extensible** -- easy to embed to existing ASGI server, extend core part, add 3rd party integrations
-* **Realtime** -- operating through websockets bus, callback-based client <-> server communication
+* **Flexible and extensible** -- easy to customize, add 3rd party integrations
+* **Realtime** -- operating through websockets bus, client & backend in app
 * **Lightweight frontend** -- based on Parcel
 * **Crafted with ❤️**
 
