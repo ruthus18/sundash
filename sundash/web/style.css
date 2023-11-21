@@ -5,11 +5,16 @@
 }
 
 body {
-    background-color: rgb(230, 230, 245);
+    background-color: #1d2021;
+}
+
+p,b,h1 {
+    color: #ebdbb2;
 }
 
 h1 {
-    border-bottom: 1px black solid;
+    border-bottom: 1px #928374 solid;
+    padding-bottom: 5px;
 }
 
 b {
@@ -21,8 +26,37 @@ li {
     margin-left: 30px;
 }
 
+
+p,b {
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+
+button {
+    color: #ebdbb2;
+    background-color: #1d2021;
+    transition-duration: 0.4s;
+    border: none;
+    border-radius: 4px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+button:hover {
+    background-color: #d65d0e;
+}
+
+
 #app {
     width: 1000px;
     margin-left: auto;
     margin-right: auto;
+}
+
+
+#menu {
+    margin-bottom: 20px;
 }

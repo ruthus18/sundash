@@ -1,4 +1,4 @@
-let socket = new WebSocket('ws:/127.0.0.1:5000/');
+let socket = new WebSocket('ws:/127.0.0.1:5000/')
 
 socket.onopen = event => {
     console.log(`[WS] CONN_OPEN: ${event.target.url}`)

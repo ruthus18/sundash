@@ -26,3 +26,7 @@ class Clock(Component):
 
 
 run = lambda: app.run(layout=('<h1>🕰️ Clock</h1>', Clock))
+
+
+if __name__ == '__main__':
+    run()

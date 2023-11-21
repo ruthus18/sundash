@@ -60,7 +60,7 @@ Run example:
     app.run(layout=('<h1>Clock Test</h1>', Clock()))
 ```
 
-![clock](docs/examples/_02_clock.png "Clock")
+![clock](examples/img/_02_clock.png "Clock")
 
 
 ### В чем идея?

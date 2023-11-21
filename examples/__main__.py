@@ -13,5 +13,9 @@ if __name__ == '__main__':
             from ._02_clock import run
             run()
 
+        case 'coiny':
+            from ._03_coiny import run
+            run()
+
         case _:
             raise RuntimeError('unknown example')

@@ -36,6 +36,7 @@ ignore = [
     "E203",  # whitespace before ':'
     "E731",  # do not assign a lambda expression, use a def
     "E402",  # module level import not at top of file
+    "W504",  # line break after binary operator
 ]
 exclude = [
     "node_modules",

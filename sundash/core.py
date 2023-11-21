@@ -137,9 +137,10 @@ class App:
     async def task(
         self,
         layout: t.Iterable[Component | HTML] = [],
+        title: str = 'Sundash',
     ) -> None:
         self.layout = Layout()
         for comp in layout: self.layout.append(comp)
 
-        self.server = Server()
+        self.server = Server(html_title=title)
         await self.server.task()

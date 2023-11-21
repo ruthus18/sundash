@@ -11,7 +11,7 @@ app = App()
 class Counter(Component):
     btn_minus = '<button id="minus">-</button>'
     btn_plus = '<button id="plus">+</button>'
-    html = '   '.join((btn_minus, '<b>{{ count }}</b>', btn_plus))
+    html = btn_minus + '<b>{{ count }}</b>' + btn_plus
 
     @dataclass
     class Vars:
@@ -29,3 +29,7 @@ class Counter(Component):
 
 
 run = lambda: app.run(layout=('<h1>🧮 Counter</h1>', Counter))
+
+
+if __name__ == '__main__':
+    run()
