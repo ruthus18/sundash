@@ -60,7 +60,7 @@ Run example (counter with buttons and user interaction):
 
 
     class Clock(Component):
-        html = '<p><b>Time:</b> {{ time }}<p/>'
+        html = '<p><b>Time: </b>{{ time }}<p/>'
 
         class Vars:
             # you can pass init values (static or procedural)
@@ -72,7 +72,7 @@ Run example (counter with buttons and user interaction):
             await self.set('time', now())  # live update of value
 
     # add plain HTML or own components
-    app.run(layout=('<h1>Clock Test</h1>', Clock()))
+    app.run(layout=('<h1>🕰️ Clock</h1>', Clock))
 ```
 
 ![clock](examples/img/_02_clock.png "Clock")
