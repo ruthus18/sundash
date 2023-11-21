@@ -18,10 +18,25 @@ Require Python 3.12 and npm
 ```
 
 
+### Frontend
+
+
+**FIXME:**
+
+_Frontend build not working now, when install from PyPi_
+
+_Need to upgrade frontend and build system_
+
+```bash
+    npm install
+```
+
+
 ### Examples
 
-Check `examples` folder
-Run example:
+Check `examples` folder.
+
+Run example (counter with buttons and user interaction):
 
 ```bash
     python -m examples counter
