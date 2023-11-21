@@ -34,7 +34,6 @@ p,b {
 
 
 button {
-    color: #ebdbb2;
     background-color: #1d2021;
     transition-duration: 0.4s;
     border: none;
@@ -46,7 +45,7 @@ button {
 }
 
 button:hover {
-    background-color: #d65d0e;
+    background-color: #d79921;  /* TODO: color customization from app */
 }
 
 
@@ -59,4 +58,8 @@ button:hover {
 
 #menu {
     margin-bottom: 20px;
+
+    b {
+        color: #fbf1c7;
+    }
 }
