@@ -8,6 +8,8 @@
 * **Lightweight frontend** -- based on Parcel
 * **Crafted with ❤️**
 
+Link to project on PyPi: https://pypi.org/project/sundash/
+
 
 ### Installation
 
