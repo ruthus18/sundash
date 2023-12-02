@@ -5,7 +5,6 @@ import os
 from dataclasses import dataclass
 
 import uvicorn
-from starlette.requests import Request
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 from starlette.types import Receive
@@ -15,7 +14,6 @@ from starlette.websockets import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
 from .core import COMMAND
-from .core import HTML
 from .core import SIGNAL
 from .core import emit_signal
 from .core import get_signals_map
@@ -82,16 +80,11 @@ class Server:
             # because I want `Ctrl + C` to work correct
             pass
 
-    def __init__(
-        self,
-        host: str = 'localhost',
-        port: int = 5000,
-        html_title: str = 'Sundash',
-    ):
+    def __init__(self, host: str = 'localhost', port: int = 5000):
         self.host = host
         self.port = port
-        self.html_title = html_title
 
+        self._static_files = StaticFiles(directory=self.STATIC_DIR)
         self._index_html: str = None
         self._connections: dict[int: WSConnection] = {}
 
@@ -126,10 +119,8 @@ class Server:
             await self._handle_websocket_request(scope, receive, send)
 
         else:
-            response = HTMLResponse(
-                content='<b>Not allowed</b>', status_code=405
-            )
-            await response(scope, receive, send)
+            resp = HTMLResponse(content='<b>Not allowed</b>', status_code=405)
+            await resp(scope, receive, send)
 
     async def _handle_lifespan(
         self, scope: Scope, receive: Receive, send: Send
@@ -150,26 +141,17 @@ class Server:
     async def _handle_http_request(
         self, scope: Scope, receive: Receive, send: Send
     ) -> None:
+        path = self._static_files.get_path(scope)
 
-        request = Request(scope, receive, send)
-        path = request.url.components.path
+        if path == '.':
+            resp = await self._static_files.get_response('index.html', scope)
+            await resp(scope, receive, send)
 
         if any([path.endswith(ext) for ext in self.ALLOWED_STATIC_FILES]):
-            static_files = StaticFiles(directory=self.STATIC_DIR)
-            await static_files(scope, receive, send)
+            await self._static_files(scope, receive, send)
 
-        else:
-            content = self._get_index_html_content()
-            response = HTMLResponse(content=content, status_code=200)
-            await response(scope, receive, send)
-
-    def _get_index_html_content(self) -> HTML:
-        if not self._index_html:
-            with open(self.STATIC_DIR + '/index.html') as f:
-                self._index_html = (
-                    f.read().replace('{{ _app_title }}', self.html_title)
-                )
-        return self._index_html
+        resp = HTMLResponse(content='<b>Not found</b>', status_code=404)
+        await resp(scope, receive, send)
 
     async def _handle_websocket_request(
         self, scope: Scope, receive: Receive, send: Send

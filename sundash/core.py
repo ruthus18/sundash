@@ -134,13 +134,9 @@ class App:
         except KeyboardInterrupt:
             pass
 
-    async def task(
-        self,
-        layout: t.Iterable[Component | HTML] = [],
-        title: str = 'Sundash',
-    ) -> None:
+    async def task(self, layout: t.Iterable[Component | HTML] = []) -> None:
         self.layout = Layout()
         for comp in layout: self.layout.append(comp)
 
-        self.server = Server(html_title=title)
+        self.server = Server()
         await self.server.task()
