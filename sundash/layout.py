@@ -42,6 +42,12 @@ class BUTTON_CLICK(SIGNAL):
 
 
 @dataclass
+class INPUT_UPDATED(SIGNAL):
+    name: str
+    value: str
+
+
+@dataclass
 class UPDATE_LAYOUT(COMMAND):
     html: HTML
     vars: VarStorage

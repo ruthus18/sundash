@@ -65,6 +65,18 @@ function _init_buttons() {
 }
 
 
+function _init_inputs() {
+    const inputs = [...document.getElementsByTagName('input')]
+    inputs.forEach(input => {
+        console.log(input)
+        input.onchange = (e) => {
+            socket.send(`INPUT_UPDATED {"name": "${input.name}", "value": "${input.value}"}`)
+            e.target.value = ''
+        }
+    })
+}
+
+
 function update_layout(data) {
     app.innerHTML = ''
     app.__html = data.html
@@ -78,6 +90,7 @@ function update_layout(data) {
 
     app.innerHTML = response_html
     _init_buttons()
+    _init_inputs()
     
     socket.send('LAYOUT_UPDATED {}')
 }
@@ -87,6 +100,7 @@ function set_var(data) {
     app.__vars[data.key] = data.value
     app.innerHTML = app.__html.replace(`{{ ${data.key} }}`, data.value)
     _init_buttons()
+    _init_inputs()
     
     socket.send('VAR_SET {}')
 }

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sundash"
-version = "0.0.5"
+version = "0.0.6dev"
 description = "Python & JS micro framework for realtime web UI applications"
 authors = ["Danil Tryapchev <ruthus18@gmail.com>"]
 readme = "README.md"

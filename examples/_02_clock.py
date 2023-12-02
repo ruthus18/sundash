@@ -12,7 +12,6 @@ app = App()
 now = lambda: dt.datetime.now().strftime('%H:%M:%S')
 
 
-# FIXME: not working, need to implement dynamic vars and scheduler
 class Clock(Component):
     html = '<p><b>Time:</b> {{ time }}<p/>'
 
@@ -26,6 +25,10 @@ class Clock(Component):
 
 
 run = lambda: app.run(layout=('<h1>🕰️ Clock</h1>', Clock))
+
+
+# FIXME: example not working, need to implement dynamic vars and scheduler
+raise NotImplementedError
 
 
 if __name__ == '__main__':

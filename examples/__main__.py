@@ -17,5 +17,9 @@ if __name__ == '__main__':
             from ._03_coiny import run
             run()
 
+        case 'search':
+            from ._04_search import run
+            run()
+
         case _:
             raise RuntimeError('unknown example')

@@ -1,5 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500;700&display=swap');
 
+/* https://www.paulirish.com/2012/box-sizing-border-box-ftw/ */
+html {
+    box-sizing: border-box;
+}
+
+*, *:before, *:after {
+    box-sizing: inherit;
+}
+
+
 * {
     font-family: 'Roboto Mono', monospace;
 }
@@ -34,19 +44,32 @@ p,b {
 
 
 button {
-    color: #fbf1c7;
+    color: #ebdbb2;
     background-color: #1d2021;
     transition-duration: 0.4s;
     border: none;
     border-radius: 4px;
-    padding-left: 10px;
-    padding-right: 10px;
-    padding-top: 5px;
-    padding-bottom: 5px;
+    padding: 5px 10px;
 }
 
 button:hover {
     background-color: #d79921;  /* TODO: color customization from app */
+}
+
+input {
+    background-color: #1d2021;
+    color: #ebdbb2;
+    width: 100%;
+    padding: 10px 20px;
+    margin: 10px 0;
+    border: 1px solid #928374;
+    border-radius: 4px;
+    outline: none;
+    width: 100%
+}
+
+input:focus {
+    border: 1px solid #fbf1c7;
 }
 
 
