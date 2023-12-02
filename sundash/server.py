@@ -1,7 +1,7 @@
 import contextvars
 import json
 import logging
-import subprocess
+import os
 from dataclasses import dataclass
 
 import uvicorn
@@ -74,6 +74,8 @@ class Server:
     _EXIT_CODE = 1
     ALLOWED_STATIC_FILES = ('.html', 'css', '.js', '.map', '.ico')
 
+    STATIC_DIR = os.path.dirname(__file__) + '/web'
+
     class _ASGIServer(uvicorn.Server):
         def install_signal_handlers(self) -> None:
             # replace default signal catch
@@ -94,9 +96,6 @@ class Server:
         self._connections: dict[int: WSConnection] = {}
 
     async def task(self) -> None:
-        build_ui()
-        logger.info(f'Starting server at http://{self.host}:{self.port}/')
-
         config = uvicorn.Config(
             app=self,
             host=self.host,
@@ -105,6 +104,8 @@ class Server:
             log_config=log_config,
         )
         server = self._ASGIServer(config=config)
+
+        logger.info('Starting server')
         try:
             await server.serve()
         finally:
@@ -154,7 +155,7 @@ class Server:
         path = request.url.components.path
 
         if any([path.endswith(ext) for ext in self.ALLOWED_STATIC_FILES]):
-            static_files = StaticFiles(directory='static')
+            static_files = StaticFiles(directory=self.STATIC_DIR)
             await static_files(scope, receive, send)
 
         else:
@@ -164,7 +165,7 @@ class Server:
 
     def _get_index_html_content(self) -> HTML:
         if not self._index_html:
-            with open('static/index.html') as f:
+            with open(self.STATIC_DIR + '/index.html') as f:
                 self._index_html = (
                     f.read().replace('{{ _app_title }}', self.html_title)
                 )
@@ -193,9 +194,3 @@ class Server:
         finally:
             await emit_signal(CLIENT_DISCONNECTED)
             set_connection(None)
-
-
-def build_ui():
-    logger.info('Building web UI...')
-    # FIXME control output and redirect to logger
-    subprocess.run(['npm', 'run', 'build'])

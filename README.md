@@ -5,7 +5,6 @@
 * **ASGI-based** -- minimal 3rd party dependencies and clean core part
 * **Flexible and extensible** -- easy to customize, add 3rd party integrations
 * **Realtime** -- operating through websockets bus, client & backend in app
-* **Lightweight frontend** -- based on Parcel
 * **Crafted with ❤️**
 
 Link to project on PyPi: https://pypi.org/project/sundash/
@@ -13,26 +12,9 @@ Link to project on PyPi: https://pypi.org/project/sundash/
 
 ### Installation
 
-Require Python 3.12 and npm
-
 ```bash
     pip install sundash
 ```
-
-
-### Frontend
-
-
-**FIXME:**
-
-_Frontend build not working now, when install from PyPi_
-
-_Need to upgrade frontend and build system_
-
-```bash
-    npm install
-```
-
 
 ### Examples
 
@@ -93,8 +75,7 @@ Run example (counter with buttons and user interaction):
 
 ### Development
 
-* Required: npm, nodejs, python 3.12, poetry, virtualenv
-* Install JS dependencies: `npm install`
+* Required: python 3.12, poetry, virtualenv
 * Install Python dependencies: `poetry install --with=dev`
 * Run local linters: `poe q`
 * Publish package: `poetry publish --build`

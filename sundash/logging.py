@@ -28,7 +28,7 @@ log_config = {
             "handlers": ["stdout"],
             "level": logging.DEBUG,
         },
-        "uvicorn": {
+        "uvicorn.access": {
             "handlers": ["null"],
             "propagate": False,
         },
