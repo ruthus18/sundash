@@ -18,7 +18,7 @@ body {
     background-color: #1d2021;
 }
 
-p,b,h1 {
+p,b,h1,h2,tr,td {
     color: #ebdbb2;
 }
 
@@ -53,7 +53,7 @@ button {
 }
 
 button:hover {
-    background-color: #d79921;  /* TODO: color customization from app */
+    background-color: #458588;  /* TODO: color customization from app */
 }
 
 input {
@@ -70,6 +70,22 @@ input {
 
 input:focus {
     border: 1px solid #fbf1c7;
+}
+
+table {
+    width: 100%;
+    padding: 10px;
+    text-align: left;
+    border-collapse: collapse;
+}
+
+th {
+    color: #83a598;
+}
+
+th,td {
+    padding: 10px 5px;
+    border-bottom: 1px solid #928374;
 }
 
 

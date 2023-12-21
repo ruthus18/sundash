@@ -1,3 +1,4 @@
+import asyncio
 import contextvars
 import json
 import logging
@@ -147,11 +148,12 @@ class Server:
             resp = await self._static_files.get_response('index.html', scope)
             await resp(scope, receive, send)
 
-        if any([path.endswith(ext) for ext in self.ALLOWED_STATIC_FILES]):
+        elif any([path.endswith(ext) for ext in self.ALLOWED_STATIC_FILES]):
             await self._static_files(scope, receive, send)
 
-        resp = HTMLResponse(content='<b>Not found</b>', status_code=404)
-        await resp(scope, receive, send)
+        else:
+            resp = HTMLResponse(content='<b>Not found</b>', status_code=404)
+            await resp(scope, receive, send)
 
     async def _handle_websocket_request(
         self, scope: Scope, receive: Receive, send: Send
@@ -167,7 +169,7 @@ class Server:
             while True:
                 await conn.receive_signal()
 
-        except WebSocketDisconnect:
+        except (WebSocketDisconnect, asyncio.CancelledError):
             pass
 
         except Exception as exc:
