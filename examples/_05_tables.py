@@ -17,7 +17,8 @@ class CompanyView(Table):
     init_data = COMPANIES
 
 
-run = lambda: app.run(layout=('<h1>📋 Tables</h1>', CompanyView))
+def run():
+    app.run(layout=('<h1>📋 Tables</h1>', CompanyView))
 
 
 if __name__ == '__main__':

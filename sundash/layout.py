@@ -89,7 +89,7 @@ class Component:
         return functools.wraps(callback)(wrapper)
 
     @classmethod
-    def schedule_callback(
+    def schedule_subscribe(
         cls, signal_cls: SIGNAL.T, cls_name: str, func_name: str
     ) -> None:
         cls._callbacks.add((signal_cls, cls_name, func_name))

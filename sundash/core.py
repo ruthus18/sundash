@@ -109,7 +109,7 @@ def on(signal_cls: SIGNAL.T) -> AnyCallback:
             # `on` called for class function -> not valid callback...
             # only valid in component interface
             from .layout import Component
-            Component.schedule_callback(signal_cls, cls_name, func.__name__)
+            Component.schedule_subscribe(signal_cls, cls_name, func.__name__)
 
         elif self is not None and not cls_name:
             raise RuntimeError  # no way...

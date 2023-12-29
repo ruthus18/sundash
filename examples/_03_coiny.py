@@ -79,7 +79,8 @@ class CoinyMenu(Menu):
         await send_command(UPDATE_LAYOUT(html=new_layout, vars={}))
 
 
-run = lambda: app.run(layout=[CoinyMenu])
+def run():
+    app.run(layout=[CoinyMenu])
 
 
 if __name__ == '__main__':

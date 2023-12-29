@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sundash"
-version = "0.0.6"
+version = "0.0.7dev"
 description = "Python & JS micro framework for realtime web UI applications"
 authors = ["Danil Tryapchev <ruthus18@gmail.com>"]
 readme = "README.md"
@@ -29,7 +29,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.flake8]
 max-complexity = 8
-max-line-length = 120
+max-line-length = 79
 ignore = [
     "E701",  # multiple statements on one line
     "E704",  # multiple statements on one line

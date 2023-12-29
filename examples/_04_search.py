@@ -30,12 +30,14 @@ class Search(Component):
     @on(INPUT_UPDATED)
     async def show_results(self, sig: INPUT_UPDATED) -> None:
         n = random.randint(0, 10)
+        print(f'INPUT NAME: {sig.name}')
         results = f'Found {n} results for "{sig.value}"'
 
         await self.set('results', results)
 
 
-run = lambda: app.run(layout=['<h1>🔎 Search</h1>', Search])
+def run():
+    app.run(layout=['<h1>🔎 Search</h1>', Search])
 
 
 if __name__ == '__main__':

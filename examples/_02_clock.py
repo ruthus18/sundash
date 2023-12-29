@@ -24,12 +24,11 @@ class Clock(Component):
         await self.set('time', now())
 
 
-run = lambda: app.run(layout=('<h1>🕰️ Clock</h1>', Clock))
-
-
-# FIXME: example not working, need to implement dynamic vars and scheduler
-raise NotImplementedError
+def run():
+    app.run(layout=['<h1>🕰️ Clock</h1>', Clock])
 
 
 if __name__ == '__main__':
+    # FIXME: example not working, need to implement dynamic vars and scheduler
+    raise NotImplementedError
     run()
