@@ -1,23 +1,27 @@
 ### (TODO)
 
+Tochka design resources: https://tochka.com/rko/design/
+
+
 app
 
-  * прокачать петушковый интерфейс присваивания динамичных переменныых
-  * restore procedure vars
-  * scheduler basics
+  * router
+  * upgrade sessions & fix bugs with callbacks lifetime
+  * работа с переменными - commit-like механика, интерфейс
+  * scheduler
+  * define sundash extension modules basics (`sundash.ext._base`)
+  * live update (watchdog)
   * find the format for communication description (need to draw...)
-  * define sundash modules (`sundash.ext._base`)
 
 frontend
 
-  * fix frontent build in case when sundash is 3rd party library
-  * theme customization, frontend folder management, adaptive layout out-of-box
+  * theme customization
+      https://dev.to/ananyaneogi/create-a-dark-light-mode-switch-with-css-variables-34l8
 
-
-### reflection
-
-  * do i really need Parcel ???
-  * enable app live-update - parcel + uvicorn (watchdog)
+  * tochka theme
+  
+  * frontend folder management
+  * adaptive layout out-of-box
 
 
 ### ext candidates
