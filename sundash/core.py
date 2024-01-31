@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import typing as t
 from abc import ABC
 from dataclasses import dataclass
-
-from . import _utils
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +24,6 @@ class _MESSAGE(ABC):
 @dataclass
 class SIGNAL(_MESSAGE):
     type T = type[SIGNAL]
-
-
-@dataclass
-class EVERY_SECOND(SIGNAL): ...
 
 
 @dataclass
@@ -92,10 +85,25 @@ def unsubscribe(signal_cls: SIGNAL.T, callback: Callback) -> None:
     _callbacks[sig_name].remove(callback)
 
 
+def _get_f_self(func: t.Callable) -> object | None:
+    try:
+        return func.__self__
+    except AttributeError:
+        return None
+
+
+def _get_f_cls_name(func: t.Callable) -> str | None:
+    name = func.__qualname__.split('.')
+    if len(name) > 2:
+        raise RuntimeError
+
+    return name[0] if len(name) == 2 else None
+
+
 def on(signal_cls: SIGNAL.T) -> AnyCallback:
     def wrapper(func: AnyCallback) -> AnyCallback:
-        self = _utils.get_f_self(func)
-        cls_name = _utils.get_f_cls_name(func)
+        self = _get_f_self(func)
+        cls_name = _get_f_cls_name(func)
 
         if self is not None and cls_name:
             # `on` called for `self.method` -> valid callback
@@ -117,26 +125,3 @@ def on(signal_cls: SIGNAL.T) -> AnyCallback:
         return func
 
     return wrapper
-
-
-# 3. App
-
-
-from .layout import Component
-from .layout import Layout
-from .server import Server
-
-
-class App:
-    def run(self, **params: dict) -> None:
-        try:
-            asyncio.run(self.task(**params))
-        except KeyboardInterrupt:
-            pass
-
-    async def task(self, layout: t.Iterable[Component | HTML] = []) -> None:
-        self.layout = Layout()
-        for comp in layout: self.layout.append(comp)
-
-        self.server = Server()
-        await self.server.task()

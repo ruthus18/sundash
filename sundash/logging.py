@@ -7,7 +7,10 @@ log_config = {
     "formatters": {
         "default": {
             "class": "colorlog.ColoredFormatter",
-            "format": ("{green}[{asctime}]{reset} {bg_green}{levelname}{reset} {blue}{name}:{reset} {message}"),
+            "format": (
+                "{green}[{asctime}]{reset} {bg_green}{levelname}{reset} "
+                "{blue}{name}:{reset} {message}"
+            ),
             "style": "{",
         },
     },

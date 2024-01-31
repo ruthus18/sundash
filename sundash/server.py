@@ -74,11 +74,12 @@ class Server:
     ALLOWED_STATIC_FILES = ('.html', 'css', '.js', '.map', '.ico')
 
     STATIC_DIR = os.path.dirname(__file__) + '/web'
+    INDEX_HTML_PATH = STATIC_DIR + '/index.html'
 
     class _ASGIServer(uvicorn.Server):
         def install_signal_handlers(self) -> None:
             # replace default signal catch
-            # because I want `Ctrl + C` to work correct
+            # because I want `Ctrl + C` to work as expected
             pass
 
     def __init__(self, host: str = 'localhost', port: int = 5000):
@@ -86,10 +87,9 @@ class Server:
         self.port = port
 
         self._static_files = StaticFiles(directory=self.STATIC_DIR)
-        self._index_html: str = None
         self._connections: dict[int: WSConnection] = {}
 
-    async def task(self) -> None:
+    async def run(self) -> None:
         config = uvicorn.Config(
             app=self,
             host=self.host,
@@ -145,7 +145,9 @@ class Server:
         path = self._static_files.get_path(scope)
 
         if path == '.':
-            resp = await self._static_files.get_response('index.html', scope)
+            resp = await self._static_files.get_response(
+                self.INDEX_HTML_PATH, scope
+            )
             await resp(scope, receive, send)
 
         elif any([path.endswith(ext) for ext in self.ALLOWED_STATIC_FILES]):

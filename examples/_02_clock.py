@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from sundash import App
 from sundash import Component
 from sundash import on
-from sundash.core import EVERY_SECOND
+from sundash.scheduler import EVERY_SECOND
 
 app = App()
 

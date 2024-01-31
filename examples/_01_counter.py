@@ -29,7 +29,7 @@ class Counter(Component):
 
 
 def run():
-    app.run(layout=['<h1>🧮 Counter</h1>'])
+    app.run(layout=['<h1>🧮 Counter</h1>', Counter])
 
 
 if __name__ == '__main__':

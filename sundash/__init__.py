@@ -1,4 +1,4 @@
-from .core import App
+from .app import App
 from .core import on
 from .layout import Component
 from .layout import Var
