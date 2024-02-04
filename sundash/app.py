@@ -49,8 +49,8 @@ class App(metaclass=_AppSingleton):
     Layout = Layout
 
     def __init__(self):
-        register_system_callback('on_session_open', self.on_session_open)
-        register_system_callback('on_event', self.on_event)
+        register_system_callback('on_session_open', self.update_layout)
+        register_system_callback('on_event', self.dispatch_event)
 
     def run_sync(self, components: Components = []) -> None:
         try:
@@ -64,8 +64,8 @@ class App(metaclass=_AppSingleton):
 
         await self.server.run()
 
-    async def on_session_open(self, session: Session):
+    async def update_layout(self, session: Session):
         await session.send_command(UPDATE_LAYOUT(html=self.layout.as_html))
 
-    async def on_event(self, event: EVENT):
-        logger.info('on_event called')
+    async def dispatch_event(self, event: EVENT):
+        logger.info(f'dispatching event {event._name}')

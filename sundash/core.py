@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import abc
 import asyncio
-import contextlib
 import logging
 import typing as t
-from dataclasses import asdict
-from dataclasses import dataclass
+import dataclasses
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +38,10 @@ class AbstractSession(abc.ABC):
         if 'html' in fmt_data:
             fmt_data['html'] = '...'
 
-        logger.info(f'[{self.id}] >> {cmd._name}  {fmt_data}')
+        logger.info(f'[{self.id}] << {cmd._name}  {fmt_data}')
 
 
-@dataclass
+@dataclasses.dataclass
 class MessageContext:
     session: AbstractSession
 
@@ -53,13 +51,11 @@ class _MESSAGE(abc.ABC):
     type T = type[_MESSAGE]
 
     _ctx: MessageContext
-
-    _cls = property(lambda self: self.__class__)
-    _name = property(lambda self: self._cls.__name__)
-    _data = property(lambda self: asdict(self))
+    _name = property(lambda self: self.__class__.__name__)
+    _data = property(lambda self: dataclasses.asdict(self))
 
 
-@dataclass
+@dataclasses.dataclass
 class EVENT(_MESSAGE):
     """`Client` -> `Server` message
     """
@@ -70,7 +66,7 @@ class EVENT(_MESSAGE):
         return {ec.__name__: ec for ec in EVENT.__subclasses__()}[name]
 
 
-@dataclass
+@dataclasses.dataclass
 class COMMAND(_MESSAGE):
     """`Server` -> `Client` message
     """
@@ -82,7 +78,7 @@ async def _dummy_callback(**kwargs): ...
 
 _system_callbacks = {
     'on_session_open': _dummy_callback,  # <- session
-    'on_session_closed': _dummy_callback,  # <- session
+    'on_session_close': _dummy_callback,  # <- session
     'on_event': _dummy_callback,  # <- event
 }
 
@@ -95,62 +91,20 @@ async def run_system_callback(name: str, **kwargs):
     await _system_callbacks[name](**kwargs)
 
 
-async def _listen_events(session: AbstractSession, events_q: asyncio.Queue):
-
-    with contextlib.suppress(SessionClosed, asyncio.CancelledError):
+async def on_session(session: AbstractSession):
+    await run_system_callback('on_session_open', session=session)
+    try:
         while True:
             event = await session.listen_event()
             event._ctx = MessageContext(session=session)
 
             await run_system_callback('on_event', event=event)
-            await events_q.put(event)
 
-
-async def _dispatch_events(session: AbstractSession, events_q: asyncio.Queue):
-
-    with contextlib.suppress(asyncio.CancelledError):
-        while True:
-            event = await events_q.get()
-            for callback in get_event_callbacks(event._name):
-                await callback(event)
-
-
-async def on_session(
-    session: AbstractSession,
-    tasks: tuple[t.Awaitable] = (_listen_events, _dispatch_events)
-):
-    await run_system_callback('on_session_open', session=session)
-
-    events_q = asyncio.Queue()
-    try:
-        await asyncio.wait([
-            asyncio.create_task(t(session, events_q)) for t in tasks
-        ])
-    except asyncio.CancelledError:
+    except (SessionClosed, asyncio.CancelledError):
         pass
+
+    except Exception as e:
+        logger.exception(e)
+
     finally:
-        await run_system_callback('on_session_closed', session=session)
-
-
-type EventCallback = t.Awaitable[t.Callable[[EVENT], None]]
-
-_callbacks: dict[EVENT.Name, list[EventCallback]] = {}
-
-
-def get_event_callbacks(event_name: EVENT.Name) -> list[EventCallback]:
-    return _callbacks.get(event_name) or []
-
-
-def register_event_callback(event_name: EVENT.Name, callback: EventCallback):
-    event_callbacks = get_event_callbacks(event_name)
-    event_callbacks.append(callback)
-
-    _callbacks[event_name] = event_callbacks
-
-
-def on(event_cls: EVENT.T) -> EventCallback:
-    def wrapper(callback: EventCallback) -> EventCallback:
-        register_event_callback(event_cls.__name__, callback)
-        return callback
-
-    return wrapper
+        await run_system_callback('on_session_close', session=session)

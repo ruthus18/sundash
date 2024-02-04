@@ -2,11 +2,7 @@ from sundash import App
 
 
 def run():
-    components = [
-        '<h1>⚙️ Sundash Demo</h1>',
-        '<p>Hello world!</p>'
-    ]
-    App().run_sync(components)
+    App().run_sync(['<p>Hello world!</p>'])
 
 
 if __name__ == '__main__':
