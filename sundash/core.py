@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import abc
+import asyncio
+import contextlib
 import logging
 import typing as t
-from abc import ABC
+from dataclasses import asdict
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -11,117 +14,143 @@ logger = logging.getLogger(__name__)
 type HTML = str
 
 
-# 1. Bus
+class SessionClosed(Exception): ...
 
 
-class _MESSAGE(ABC):
-    type Name = str
+class AbstractSession(abc.ABC):
+    type ID = str
+    id: ID
 
-    _name = property(lambda self: self.__class__.__name__)
-    _data = property(lambda self: self.__dict__)
+    @abc.abstractmethod
+    async def _listen_event(self) -> EVENT: ...
+
+    @abc.abstractmethod
+    async def _send_command(self, cmd: COMMAND) -> None: ...
+
+    async def listen_event(self) -> EVENT:
+        event = await self._listen_event()
+
+        logger.info(f'[{self.id}] >> {event._name}  {event._data}')
+        return event
+
+    async def send_command(self, cmd: COMMAND):
+        await self._send_command(cmd)
+
+        fmt_data = cmd._data
+        if 'html' in fmt_data:
+            fmt_data['html'] = '...'
+
+        logger.info(f'[{self.id}] >> {cmd._name}  {fmt_data}')
 
 
 @dataclass
-class SIGNAL(_MESSAGE):
-    type T = type[SIGNAL]
+class MessageContext:
+    session: AbstractSession
+
+
+class _MESSAGE(abc.ABC):
+    type Name = str
+    type T = type[_MESSAGE]
+
+    _ctx: MessageContext
+
+    _cls = property(lambda self: self.__class__)
+    _name = property(lambda self: self._cls.__name__)
+    _data = property(lambda self: asdict(self))
+
+
+@dataclass
+class EVENT(_MESSAGE):
+    """`Client` -> `Server` message
+    """
+    type T = type[EVENT]
+
+    @classmethod
+    def get_by_name(cls, name: EVENT.Name) -> EVENT.T:
+        return {ec.__name__: ec for ec in EVENT.__subclasses__()}[name]
 
 
 @dataclass
 class COMMAND(_MESSAGE):
+    """`Server` -> `Client` message
+    """
     type T = type[COMMAND]
 
 
-get_signals_map = lambda: {s.__name__: s for s in SIGNAL.__subclasses__()}
+async def _dummy_callback(**kwargs): ...
 
 
-async def emit_signal(sig: SIGNAL | SIGNAL.T) -> None:
-    if not isinstance(sig, SIGNAL): sig = sig()
-
-    conn = get_connection()
-    logger.info(f'[{conn.id}] -> {sig._name}  {sig._data}')
-
-    for callback in _callbacks.get(sig._name, set()):
-        await callback(sig)
+_system_callbacks = {
+    'on_session_open': _dummy_callback,  # <- session
+    'on_session_closed': _dummy_callback,  # <- session
+    'on_event': _dummy_callback,  # <- event
+}
 
 
-from .server import get_connection
+def register_system_callback(name: str, callback: t.Awaitable):
+    _system_callbacks[name] = callback
 
 
-async def send_command(cmd: COMMAND | type[COMMAND]) -> None:
-    if not isinstance(cmd, COMMAND): cmd = cmd()
-
-    conn = get_connection()
-    logger.info(f'[{conn.id}] <- {cmd._name}  {cmd._data}')
-
-    await conn.send_command(cmd)
+async def run_system_callback(name: str, **kwargs):
+    await _system_callbacks[name](**kwargs)
 
 
-# 2. Callbacks
+async def _listen_events(session: AbstractSession, events_q: asyncio.Queue):
+
+    with contextlib.suppress(SessionClosed, asyncio.CancelledError):
+        while True:
+            event = await session.listen_event()
+            event._ctx = MessageContext(session=session)
+
+            await run_system_callback('on_event', event=event)
+            await events_q.put(event)
 
 
-type _FunctionCallback = t.Callable[[object, SIGNAL], None]
-type _ClassCallback = t.Callable[[SIGNAL], None]
+async def _dispatch_events(session: AbstractSession, events_q: asyncio.Queue):
 
-type ClassCallback = t.Awaitable[_ClassCallback]
-type FunctionCallback = t.Awaitable[_FunctionCallback]
-
-type AnyCallback = FunctionCallback | ClassCallback
-type Callback = FunctionCallback
-
-
-_callbacks: dict[SIGNAL.Name, set[Callback]] = {}
+    with contextlib.suppress(asyncio.CancelledError):
+        while True:
+            event = await events_q.get()
+            for callback in get_event_callbacks(event._name):
+                await callback(event)
 
 
-def subscribe(signal_cls: SIGNAL.T, callback: Callback) -> None:
-    sig_name = signal_cls.__name__
-    if sig_name not in _callbacks:
-        _callbacks[sig_name] = set()
+async def on_session(
+    session: AbstractSession,
+    tasks: tuple[t.Awaitable] = (_listen_events, _dispatch_events)
+):
+    await run_system_callback('on_session_open', session=session)
 
-    _callbacks[sig_name].add(callback)
-
-
-def unsubscribe(signal_cls: SIGNAL.T, callback: Callback) -> None:
-    sig_name = signal_cls.__name__
-    _callbacks[sig_name].remove(callback)
-
-
-def _get_f_self(func: t.Callable) -> object | None:
+    events_q = asyncio.Queue()
     try:
-        return func.__self__
-    except AttributeError:
-        return None
+        await asyncio.wait([
+            asyncio.create_task(t(session, events_q)) for t in tasks
+        ])
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await run_system_callback('on_session_closed', session=session)
 
 
-def _get_f_cls_name(func: t.Callable) -> str | None:
-    name = func.__qualname__.split('.')
-    if len(name) > 2:
-        raise RuntimeError
+type EventCallback = t.Awaitable[t.Callable[[EVENT], None]]
 
-    return name[0] if len(name) == 2 else None
+_callbacks: dict[EVENT.Name, list[EventCallback]] = {}
 
 
-def on(signal_cls: SIGNAL.T) -> AnyCallback:
-    def wrapper(func: AnyCallback) -> AnyCallback:
-        self = _get_f_self(func)
-        cls_name = _get_f_cls_name(func)
+def get_event_callbacks(event_name: EVENT.Name) -> list[EventCallback]:
+    return _callbacks.get(event_name) or []
 
-        if self is not None and cls_name:
-            # `on` called for `self.method` -> valid callback
-            subscribe(signal_cls, func)
 
-        elif self is None and not cls_name:
-            # `on` called for module function -> valid callback
-            subscribe(signal_cls, func)
+def register_event_callback(event_name: EVENT.Name, callback: EventCallback):
+    event_callbacks = get_event_callbacks(event_name)
+    event_callbacks.append(callback)
 
-        elif self is None and cls_name:
-            # `on` called for class function -> not valid callback...
-            # only valid in component interface
-            from .layout import Component
-            Component.schedule_subscribe(signal_cls, cls_name, func.__name__)
+    _callbacks[event_name] = event_callbacks
 
-        elif self is not None and not cls_name:
-            raise RuntimeError  # no way...
 
-        return func
+def on(event_cls: EVENT.T) -> EventCallback:
+    def wrapper(callback: EventCallback) -> EventCallback:
+        register_event_callback(event_cls.__name__, callback)
+        return callback
 
     return wrapper

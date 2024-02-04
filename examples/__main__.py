@@ -6,7 +6,8 @@ from sundash.logging import setup as setup_logging
 def run_example():
     setup_logging()
     if len(sys.argv) == 1:
-        from . import _00_start  # noqa
+        from ._00_start import run
+        run()
         return
 
     match sys.argv[1]:
@@ -29,6 +30,9 @@ def run_example():
         case 'tables':
             from ._05_tables import run
             run()
+
+        case other:
+            raise ValueError(f'unknown example: {other}')
 
 
 if __name__ == '__main__':

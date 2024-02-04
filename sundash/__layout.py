@@ -7,13 +7,10 @@ from .core import COMMAND
 from .core import HTML
 from .core import SIGNAL
 from .core import Callback
-from .core import on
 from .core import send_command
 from .core import subscribe
 from .core import unsubscribe
-from .server import CLIENT_CONNECTED
-from .server import CLIENT_DISCONNECTED
-from .server import get_connection
+from .server import get_session
 
 
 class Var[T]:
@@ -77,11 +74,11 @@ class Component:
 
         # TODO: init procedural values
         self.vars: dict = self.Vars().__dict__
-        self.conn_id = get_connection().id
+        self.conn_id = get_session().id
 
     def callback_wrapper(self, callback: Callback) -> Callback:
         async def wrapper(sig: SIGNAL):
-            conn_id = get_connection().id
+            conn_id = get_session().id
             if conn_id != self.conn_id:
                 return
             await callback(sig)
@@ -118,11 +115,11 @@ class Component:
 class Layout(list[type[Component]]):
     _sessions: dict[int, list[Component]] = {}
 
-    def __init__(self):
-        super().__init__()
+    # def __init__(self):
+    #     super().__init__()
 
-        on(CLIENT_CONNECTED)(self.open_session)
-        on(CLIENT_DISCONNECTED)(self.close_session)
+    #     # on(CLIENT_CONNECTED)(self.open_session)
+    #     # on(CLIENT_DISCONNECTED)(self.close_session)
 
     def append(self, item: type[Component] | HTML) -> None:
         if isinstance(item, str):
@@ -148,13 +145,13 @@ class Layout(list[type[Component]]):
 
         html = ''.join((c.html for c in layout))
 
-        id = get_connection().id
+        id = get_session().id
         self._sessions[id] = layout
 
         await send_command(UPDATE_LAYOUT(html=html, vars=data))
 
     async def close_session(self, _) -> None:
-        id = get_connection().id
+        id = get_session().id
         for comp in self._sessions[id]:
             comp.unsubscribe_callbacks()
 

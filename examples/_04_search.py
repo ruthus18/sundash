@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from sundash import App
 from sundash import Component
 from sundash import on
-from sundash.layout import INPUT_UPDATED
+from sundash.__layout import INPUT_UPDATED
 
 app = App()
 

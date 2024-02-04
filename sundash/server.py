@@ -1,9 +1,6 @@
-import asyncio
-import contextvars
 import json
 import logging
 import os
-from dataclasses import dataclass
 
 import uvicorn
 from starlette.responses import HTMLResponse
@@ -14,24 +11,13 @@ from starlette.types import Send
 from starlette.websockets import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
-from .core import COMMAND
-from .core import SIGNAL
-from .core import emit_signal
-from .core import get_signals_map
+from . import core
 from .logging import log_config
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class CLIENT_CONNECTED(SIGNAL): ...
-
-
-@dataclass
-class CLIENT_DISCONNECTED(SIGNAL): ...
-
-
-class WSConnection:
+class Session(core.AbstractSession):
     __id = 0
 
     @classmethod
@@ -40,33 +26,33 @@ class WSConnection:
         return cls.__id
 
     def __init__(self, socket: WebSocket) -> None:
-        self.id = self.__class__.new_id()
+        self.id = str(self.__class__.new_id())
         self.socket = socket
 
-    async def receive_signal(self) -> None:
-        message = await self.socket.receive_text()
+    def _parse_event(self, message: str) -> core.EVENT:
+        name, data = message.split(" ", 1)
+        event_cls = core.EVENT.get_by_name(name)
 
-        signal_name, data = message.split(" ", 1)
-        signal_cls = get_signals_map()[signal_name]
-        data = json.loads(data)
+        return event_cls(**json.loads(data))
 
-        await emit_signal(signal_cls(**data))
+    async def _listen_event(self) -> core.EVENT:
+        try:
+            message = await self.socket.receive_text()
+            return self._parse_event(message)
 
-    async def send_command(self, cmd: COMMAND) -> None:
+        except WebSocketDisconnect:
+            raise core.SessionClosed
+
+    async def _send_command(self, cmd: core.COMMAND):
         cmd_name = cmd.__class__.__name__
         cmd_params = json.dumps(cmd.__dict__)
         await self.socket.send_text(f'{cmd_name} {cmd_params}')
 
 
-_conn = contextvars.ContextVar('_conn', default=None)
-
-
-def set_connection(conn: WSConnection) -> None:
-    _conn.set(conn)
-
-
-def get_connection() -> WSConnection:
-    return _conn.get()
+class _ASGIServer(uvicorn.Server):
+    # replace default signal catch
+    # because I want to set OC signals handling elsewhere
+    def install_signal_handlers(self) -> None: ...
 
 
 class Server:
@@ -76,18 +62,9 @@ class Server:
     STATIC_DIR = os.path.dirname(__file__) + '/web'
     INDEX_HTML_PATH = STATIC_DIR + '/index.html'
 
-    class _ASGIServer(uvicorn.Server):
-        def install_signal_handlers(self) -> None:
-            # replace default signal catch
-            # because I want `Ctrl + C` to work as expected
-            pass
-
     def __init__(self, host: str = 'localhost', port: int = 5000):
-        self.host = host
-        self.port = port
-
+        self.host, self.port = host, port
         self._static_files = StaticFiles(directory=self.STATIC_DIR)
-        self._connections: dict[int: WSConnection] = {}
 
     async def run(self) -> None:
         config = uvicorn.Config(
@@ -97,7 +74,7 @@ class Server:
             log_level='debug',
             log_config=log_config,
         )
-        server = self._ASGIServer(config=config)
+        server = _ASGIServer(config=config)
 
         logger.info('Starting server')
         try:
@@ -163,20 +140,5 @@ class Server:
         socket = WebSocket(scope=scope, receive=receive, send=send)
         await socket.accept()
 
-        conn = WSConnection(socket)
-        set_connection(conn)
-
-        try:
-            await emit_signal(CLIENT_CONNECTED)
-            while True:
-                await conn.receive_signal()
-
-        except (WebSocketDisconnect, asyncio.CancelledError):
-            pass
-
-        except Exception as exc:
-            logger.exception(exc)
-
-        finally:
-            await emit_signal(CLIENT_DISCONNECTED)
-            set_connection(None)
+        session = Session(socket)
+        await core.on_session(session)

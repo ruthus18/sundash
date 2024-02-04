@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from .core import SIGNAL
+from .core import EVENT
 
 
 @dataclass
-class EVERY_SECOND(SIGNAL): ...
+class EVERY_SECOND(EVENT): ...

@@ -1,7 +1,7 @@
 import os
 
+from .__layout import Component
 from .core import HTML
-from .layout import Component
 
 __all__ = ('Table', )
 

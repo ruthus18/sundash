@@ -1,10 +1,10 @@
 from sundash import App
 from sundash import Component
+from sundash.__layout import BUTTON_CLICK
+from sundash.__layout import UPDATE_LAYOUT
 from sundash.core import HTML
 from sundash.core import on
 from sundash.core import send_command
-from sundash.layout import BUTTON_CLICK
-from sundash.layout import UPDATE_LAYOUT
 from sundash.logging import setup as _setup_logging
 
 _setup_logging()

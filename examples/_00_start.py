@@ -1,10 +1,13 @@
 from sundash import App
-from sundash import Component
-
-app = App()
 
 
-class Dummy(Component): ...
+def run():
+    components = [
+        '<h1>⚙️ Sundash Demo</h1>',
+        '<p>Hello world!</p>'
+    ]
+    App().run_sync(components)
 
 
-app.run(layout=[Dummy])
+if __name__ == '__main__':
+    run()
