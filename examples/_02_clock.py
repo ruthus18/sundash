@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from sundash import App
 from sundash import Component
 from sundash import on
-from sundash.scheduler import EVERY_SECOND
+
+# from sundash.scheduler import EVERY_SECOND
 
 app = App()
 
@@ -19,7 +20,7 @@ class Clock(Component):
     class Vars:
         time: str = now
 
-    @on(EVERY_SECOND)
+    # @on(EVERY_SECOND)
     async def update(self, _):
         await self.set('time', now())
 
