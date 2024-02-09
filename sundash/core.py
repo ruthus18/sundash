@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import dataclasses as dc
 import logging
 import typing as t
-import dataclasses
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class AbstractSession(abc.ABC):
         logger.info(f'[{self.id}] << {cmd._name}  {fmt_data}')
 
 
-@dataclasses.dataclass
+@dc.dataclass
 class MessageContext:
     session: AbstractSession
 
@@ -52,10 +52,10 @@ class _MESSAGE(abc.ABC):
 
     _ctx: MessageContext
     _name = property(lambda self: self.__class__.__name__)
-    _data = property(lambda self: dataclasses.asdict(self))
+    _data = property(lambda self: dc.asdict(self))
 
 
-@dataclasses.dataclass
+@dc.dataclass
 class EVENT(_MESSAGE):
     """`Client` -> `Server` message
     """
@@ -66,7 +66,7 @@ class EVENT(_MESSAGE):
         return {ec.__name__: ec for ec in EVENT.__subclasses__()}[name]
 
 
-@dataclasses.dataclass
+@dc.dataclass
 class COMMAND(_MESSAGE):
     """`Server` -> `Client` message
     """

@@ -1,6 +1,8 @@
 import asyncio
 import dataclasses as dc
+import functools
 import logging
+import typing as t
 
 from .core import COMMAND
 from .core import EVENT
@@ -22,45 +24,68 @@ class UPDATE_LAYOUT(COMMAND):
 class LAYOUT_UPDATED(EVENT): ...
 
 
-type Components = list[HTML]
+@dc.dataclass
+class BUTTON_CLICK(EVENT):
+    button_id: str
 
 
-class Layout(list[HTML]):
+class Component:
+    html: HTML
+
+    def __str__(self) -> str:
+        return self.html
+
+
+class HTMLComponent(Component):
+    def __init__(self, html: HTML):
+        self.html = html
+
+
+type InputLayout = t.Iterable[Component | HTML]
+
+
+class Layout(list[Component]):
+
+    def __init__(self, input_items: InputLayout):
+        items = []
+
+        for item in input_items:
+            if isinstance(item, str):
+                item = HTMLComponent(html=item)
+            elif issubclass(item, Component):
+                pass
+            else:
+                raise ValueError(
+                    f'Incorrect type of layout component: {type(item)}'
+                )
+
+            items.append(item)
+        super().__init__(items)
 
     @property
     def as_html(self) -> HTML:
-        return ''.join(self)
+        return ''.join((item.html for item in self))
 
 
-class _AppSingleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        else:
-            raise RuntimeError('Only one instance of `App` is allowed')
-
-        return cls._instances[cls]
-
-
-class App(metaclass=_AppSingleton):
+class App:
     Server = Server
     Layout = Layout
 
     def __init__(self):
+        self._callbacks: dict[Session.ID, list[t.Awaitable]] = {}
+
         register_system_callback('on_session_open', self.update_layout)
         register_system_callback('on_event', self.dispatch_event)
 
-    def run_sync(self, components: Components = []) -> None:
+    def run_sync(self, layout: InputLayout = []) -> None:
         try:
-            asyncio.run(self.run(components))
+            asyncio.run(self.run(layout))
         except KeyboardInterrupt:
             pass
 
-    async def run(self, components: Components = []) -> None:
+    async def run(self, input_layout: InputLayout = []) -> None:
         self.server = self.Server()
-        self.layout = self.Layout(components)
+        self.layout = self.Layout(input_layout)
 
         await self.server.run()
 
@@ -69,3 +94,8 @@ class App(metaclass=_AppSingleton):
 
     async def dispatch_event(self, event: EVENT):
         logger.info(f'dispatching event {event._name}')
+
+    def on(self, event: EVENT) -> t.Awaitable:
+        async def wrapper(*args, **kwargs): ...  # TODO
+
+        return functools.wraps(wrapper)

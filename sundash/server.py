@@ -55,6 +55,10 @@ class _ASGIServer(uvicorn.Server):
     def install_signal_handlers(self) -> None: ...
 
 
+response_404 = HTMLResponse(content='<b>Not found</b>', status_code=404)
+response_405 = HTMLResponse(content='<b>Not allowed</b>', status_code=405)
+
+
 class Server:
     _EXIT_CODE = 1
     ALLOWED_STATIC_FILES = ('.html', 'css', '.js', '.map', '.ico')
@@ -97,8 +101,7 @@ class Server:
             await self._handle_websocket_request(scope, receive, send)
 
         else:
-            resp = HTMLResponse(content='<b>Not allowed</b>', status_code=405)
-            await resp(scope, receive, send)
+            await response_405(scope, receive, send)
 
     async def _handle_lifespan(
         self, scope: Scope, receive: Receive, send: Send
@@ -131,8 +134,7 @@ class Server:
             await self._static_files(scope, receive, send)
 
         else:
-            resp = HTMLResponse(content='<b>Not found</b>', status_code=404)
-            await resp(scope, receive, send)
+            await response_404(scope, receive, send)
 
     async def _handle_websocket_request(
         self, scope: Scope, receive: Receive, send: Send

@@ -2,10 +2,10 @@ from dataclasses import dataclass
 
 from sundash import App
 from sundash import Component
-from sundash import on
-from sundash.__layout import BUTTON_CLICK
+from sundash.app import BUTTON_CLICK
 
 app = App()
+on = app.on
 
 
 class Counter(Component):
@@ -29,7 +29,7 @@ class Counter(Component):
 
 
 def run():
-    app.run(layout=['<h1>🧮 Counter</h1>', Counter])
+    app.run_sync(['<h1>🧮 Counter</h1>', Counter])
 
 
 if __name__ == '__main__':
