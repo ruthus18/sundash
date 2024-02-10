@@ -29,6 +29,12 @@ class BUTTON_CLICK(EVENT):
     button_id: str
 
 
+@dc.dataclass
+class INPUT_UPDATED(EVENT):
+    name: str
+    value: str
+
+
 class Component:
     html: HTML
 
@@ -37,34 +43,51 @@ class Component:
 
 
 class HTMLComponent(Component):
-    def __init__(self, html: HTML):
-        self.html = html
+    def __init__(self, html: HTML): self.html = html
 
 
-type InputLayout = t.Iterable[Component | HTML]
+type LayoutTemplate = t.Iterable[type[Component] | HTML]
+type CurrentLayout = list[Component | HTML]
 
 
-class Layout(list[Component]):
+class Layout:
 
-    def __init__(self, input_items: InputLayout):
-        items = []
+    def __init__(self, template: LayoutTemplate = []):
+        self.template: LayoutTemplate = []
+        self.storage: dict = {}
 
-        for item in input_items:
+        self.current: CurrentLayout = []
+
+        for item in template:
             if isinstance(item, str):
-                item = HTMLComponent(html=item)
+                pass
             elif issubclass(item, Component):
                 pass
             else:
                 raise ValueError(
-                    f'Incorrect type of layout component: {type(item)}'
+                    f'Incorrect type of layout component: {item}'
                 )
-
-            items.append(item)
-        super().__init__(items)
+            self.template.append(item)
 
     @property
     def as_html(self) -> HTML:
-        return ''.join((item.html for item in self))
+        return ''.join((item.html for item in self.current))
+
+    async def init_session(self, session: Session) -> None:
+
+        for item in self.template:
+            if isinstance(item, str):
+                component = HTMLComponent(html=item)
+            else:
+                component = item()
+
+            self.current.append(component)
+
+        cmd = UPDATE_LAYOUT(html=self.as_html)
+        await session.send_command(cmd)
+
+    def close_session(self) -> None:
+        self.current = []
 
 
 class App:
@@ -74,28 +97,32 @@ class App:
     def __init__(self):
         self._callbacks: dict[Session.ID, list[t.Awaitable]] = {}
 
-        register_system_callback('on_session_open', self.update_layout)
-        register_system_callback('on_event', self.dispatch_event)
+        register_system_callback('on_session_open', self.on_session_open)
+        register_system_callback('on_session_close', self.on_session_close)
+        register_system_callback('on_event', self.on_event)
 
-    def run_sync(self, layout: InputLayout = []) -> None:
+    def run_sync(self, layout_tpl: LayoutTemplate = None) -> None:
         try:
-            asyncio.run(self.run(layout))
+            asyncio.run(self.run(layout_tpl))
         except KeyboardInterrupt:
             pass
 
-    async def run(self, input_layout: InputLayout = []) -> None:
+    async def run(self, layout_tpl: LayoutTemplate = None) -> None:
         self.server = self.Server()
-        self.layout = self.Layout(input_layout)
+        self.layout = self.Layout(layout_tpl)
 
         await self.server.run()
 
-    async def update_layout(self, session: Session):
-        await session.send_command(UPDATE_LAYOUT(html=self.layout.as_html))
+    async def on_session_open(self, session: Session) -> None:
+        await self.layout.init_session(session)
 
-    async def dispatch_event(self, event: EVENT):
-        logger.info(f'dispatching event {event._name}')
+    async def on_session_close(self, session: Session) -> None:
+        self.layout.close_session()
 
     def on(self, event: EVENT) -> t.Awaitable:
         async def wrapper(*args, **kwargs): ...  # TODO
 
         return functools.wraps(wrapper)
+
+    async def on_event(self, event: EVENT) -> None:
+        logger.info(f'dispatching event {event._name}')

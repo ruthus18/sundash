@@ -3,10 +3,10 @@ from dataclasses import dataclass
 
 from sundash import App
 from sundash import Component
-from sundash import on
-from sundash.__layout import INPUT_UPDATED
+from sundash.app import INPUT_UPDATED
 
 app = App()
+on = app.on
 
 
 class Search(Component):
@@ -37,7 +37,7 @@ class Search(Component):
 
 
 def run():
-    app.run(layout=['<h1>🔎 Search</h1>', Search])
+    app.run_sync(['<h1>🔎 Search</h1>', Search])
 
 
 if __name__ == '__main__':

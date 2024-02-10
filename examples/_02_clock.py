@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 from sundash import App
 from sundash import Component
-from sundash import on
 
 # from sundash.scheduler import EVERY_SECOND
 
@@ -26,7 +25,7 @@ class Clock(Component):
 
 
 def run():
-    app.run(layout=['<h1>🕰️ Clock</h1>', Clock])
+    app.run_sync(['<h1>🕰️ Clock</h1>', Clock])
 
 
 if __name__ == '__main__':

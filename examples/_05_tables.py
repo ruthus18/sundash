@@ -18,7 +18,7 @@ class CompanyView(Table):
 
 
 def run():
-    app.run(layout=('<h1>📋 Tables</h1>', CompanyView))
+    app.run_sync(['<h1>📋 Tables</h1>', CompanyView])
 
 
 if __name__ == '__main__':
