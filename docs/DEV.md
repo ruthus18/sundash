@@ -7,8 +7,10 @@
   * [0.0.8]  App routing (URLs, in-app switches)
   * [0.0.9]  Variables (initialization, realtime update, pretty interface)
 
+  *          Testing
   *          Documentation
   *          Theme customization and Tochka theme
+  *          Healthchecks
 
   * [0.1.0]  Staging-ready release
 

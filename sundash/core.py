@@ -51,7 +51,8 @@ class _MESSAGE(abc.ABC):
     type T = type[_MESSAGE]
 
     _ctx: MessageContext
-    _name = property(lambda self: self.__class__.__name__)
+    _cls = property(lambda self: self.__class__)
+    _name = property(lambda self: self._cls.__name__)
     _data = property(lambda self: dc.asdict(self))
 
 

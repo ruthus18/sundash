@@ -1,15 +1,15 @@
+import logging
 from sundash import App
 from sundash import Component
 from sundash.app import BUTTON_CLICK
-from sundash.app import UPDATE_LAYOUT
+# from sundash.app import UPDATE_LAYOUT
 from sundash.core import HTML
-from sundash.logging import setup as _setup_logging
+from sundash.app import on
 
-_setup_logging()
+logger = logging.getLogger(__name__)
 
 
 app = App()
-on = app.on
 
 
 class Button:
@@ -68,14 +68,16 @@ class CoinyMenu(Menu):
     }
 
     @on(BUTTON_CLICK)
-    async def switch_layout(self, event: BUTTON_CLICK, ctx: dict) -> None:
-        btn_map = {btn.id: btn for btn in self.layout.keys()}
-        if event.button_id not in btn_map.keys():
-            return
+    async def switch_layout(self, event: BUTTON_CLICK) -> None:
+        logger.info('switch layout')
+        # btn_map = {btn.id: btn for btn in self.layout.keys()}
+        # if event.button_id not in btn_map.keys():
+        #     return
 
-        new_layout = self.get_layout_html(btn_map[event.button_id])
+        # new_layout = self.get_layout_html(btn_map[event.button_id])
 
-        await ctx.session.send_command(UPDATE_LAYOUT(html=new_layout, vars={}))
+        # session = event._ctx.session
+        # await session.send_command(UPDATE_LAYOUT(html=new_layout, vars={}))
 
 
 def run():

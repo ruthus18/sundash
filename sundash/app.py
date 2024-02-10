@@ -1,6 +1,7 @@
+from __future__ import annotations
 import asyncio
+from collections import defaultdict
 import dataclasses as dc
-import functools
 import logging
 import typing as t
 
@@ -35,28 +36,30 @@ class INPUT_UPDATED(EVENT):
     value: str
 
 
+
+type Callback = t.Awaitable[t.Callable[[EVENT], None]]
+type CallbackRegistry = dict[EVENT.T, list[Callback]]
+
+type LayoutTemplate = t.Iterable[type[Component] | HTML]
+
+
 class Component:
     html: HTML
 
-    def __str__(self) -> str:
-        return self.html
+    def __init__(self):
+        self.callbacks: CallbackRegistry = {}
 
 
 class HTMLComponent(Component):
     def __init__(self, html: HTML): self.html = html
 
 
-type LayoutTemplate = t.Iterable[type[Component] | HTML]
-type CurrentLayout = list[Component | HTML]
-
-
 class Layout:
 
     def __init__(self, template: LayoutTemplate = []):
         self.template: LayoutTemplate = []
-        self.storage: dict = {}
-
-        self.current: CurrentLayout = []
+        self.current: list[Component] = []
+        # self.storage: dict = {}
 
         for item in template:
             if isinstance(item, str):
@@ -74,7 +77,6 @@ class Layout:
         return ''.join((item.html for item in self.current))
 
     async def init_session(self, session: Session) -> None:
-
         for item in self.template:
             if isinstance(item, str):
                 component = HTMLComponent(html=item)
@@ -86,8 +88,8 @@ class Layout:
         cmd = UPDATE_LAYOUT(html=self.as_html)
         await session.send_command(cmd)
 
-    def close_session(self) -> None:
-        self.current = []
+    def get_component_callbacks(self) -> t.Generator[CallbackRegistry]:
+        return (cmp.callbacks for cmp in self.current)
 
 
 class App:
@@ -95,11 +97,45 @@ class App:
     Layout = Layout
 
     def __init__(self):
-        self._callbacks: dict[Session.ID, list[t.Awaitable]] = {}
+        self._layouts: dict[Session.ID, Layout] = {}
+        self._callbacks: dict[Session.ID, CallbackRegistry] = {}
 
-        register_system_callback('on_session_open', self.on_session_open)
-        register_system_callback('on_session_close', self.on_session_close)
-        register_system_callback('on_event', self.on_event)
+        register_system_callback('on_session_open', self._on_session_open)
+        register_system_callback('on_session_close', self._on_session_close)
+        register_system_callback('on_event', self._on_event)
+
+    async def _on_session_open(self, session: Session) -> None:
+        layout = self.Layout(self.layout_tpl)
+        self._layouts[session.id] = layout
+
+        await layout.init_session(session)
+
+        # TODO: * impl merge op over registry
+        #       * run once instead every instance
+        callback_registry = defaultdict(list)
+
+        for callbacks in layout.get_component_callbacks():
+            for event_cls, callback in callbacks.items():
+                callback_registry[event_cls].append(callback)
+        
+        self._callbacks[session.id] = callback_registry
+
+    async def _on_session_close(self, session: Session) -> None:
+        self._layouts.pop(session.id)
+        self._callbacks.pop(session.id)
+
+    async def _on_event(self, event: EVENT) -> None:
+        session = event._ctx.session
+        callbacks = self._callbacks[session.id][event._cls]
+
+        for cb in callbacks:
+            await cb(event)
+
+    async def run(self, layout_tpl: LayoutTemplate = None) -> None:
+        self.layout_tpl = layout_tpl
+
+        self.server = self.Server()
+        await self.server.run()
 
     def run_sync(self, layout_tpl: LayoutTemplate = None) -> None:
         try:
@@ -107,22 +143,29 @@ class App:
         except KeyboardInterrupt:
             pass
 
-    async def run(self, layout_tpl: LayoutTemplate = None) -> None:
-        self.server = self.Server()
-        self.layout = self.Layout(layout_tpl)
 
-        await self.server.run()
+def on(event_cls: EVENT.T) -> t.Callable:
+    def wrapper(callback: Callback) -> Callback:
+        # self = _utils.get_f_self(func)
+        # cls_name = _utils.get_f_cls_name(func)
 
-    async def on_session_open(self, session: Session) -> None:
-        await self.layout.init_session(session)
+        # if self is not None and cls_name:
+        #     # `on` called for `self.method` -> valid callback
+        #     subscribe(signal_cls, func)
 
-    async def on_session_close(self, session: Session) -> None:
-        self.layout.close_session()
+        # elif self is None and not cls_name:
+        #     # `on` called for module function -> valid callback
+        #     subscribe(signal_cls, func)
 
-    def on(self, event: EVENT) -> t.Awaitable:
-        async def wrapper(*args, **kwargs): ...  # TODO
+        # elif self is None and cls_name:
+        #     # `on` called for class function -> not valid callback...
+        #     # only valid in component interface
+        #     from .layout import Component
+        #     Component.schedule_callback(signal_cls, cls_name, func.__name__)
 
-        return functools.wraps(wrapper)
+        # elif self is not None and not cls_name:
+        #     raise RuntimeError  # no way...
 
-    async def on_event(self, event: EVENT) -> None:
-        logger.info(f'dispatching event {event._name}')
+        return callback
+
+    return wrapper
