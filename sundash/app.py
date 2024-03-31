@@ -132,31 +132,39 @@ def convert_to_page(raw_page: RawPage) -> Page:
 
 
 class Layout:
-    DEFAULT_ROUTE = '*'
-
-    def __init__(self, raw_page: RawPage):
+    def __init__(self, raw_page: RawPage | None = None):
         self.pages: dict[Route, Page] = {}
-        self.add_page(route=self.DEFAULT_ROUTE, page=raw_page)
+        self.current_route = None
+
+        if raw_page is not None:
+            self.add_page(route=self.current_route, page=raw_page)
 
     def add_page(self, route: Route, page: RawPage) -> None:
+        if not self.current_route:
+            self.current_route = route
+
         self.pages[route] = convert_to_page(page)
+
+    def switch_page(self, route: Route) -> None:
+        self.current_route = route
 
     @property
     def current_page(self) -> Page:
-        return self.pages[self.DEFAULT_ROUTE]
+        return self.pages[self.current_route]
 
     @property
     def html(self) -> HTML:
-        return ''.join((item.html for item in self.current_page))
+        return ''.join((comp.html for comp in self.current_page))
     
     @property
     def vars(self) -> dict:
         _v = {}
-        for item in self.current_page:
-            _v.update(item.vars.__dict__)
+        for comp in self.current_page:
+            _v.update(comp.vars.__dict__)
         return _v
 
-    def get_callbacks_map(self) -> CallbacksMap:
+    @property
+    def callbacks_map(self) -> CallbacksMap:
         return self.current_page.callbacks_map
     
     @property
@@ -168,7 +176,7 @@ class App:
     Server = Server
 
     def __init__(self):
-        self.raw_page: RawPage
+        self.raw_pages: dict[Route, RawPage] = {}
         self.layouts: dict[Session.ID, Layout] = {}
 
         register_system_callback(ON_SESSION_OPEN, self._on_session_open)
@@ -176,7 +184,10 @@ class App:
         register_system_callback(ON_EVENT, self._on_event)
 
     async def _on_session_open(self, session: Session) -> None:
-        layout = Layout(self.default_page)
+        layout = Layout()
+        for route, page in self.raw_pages.items():
+            layout.add_page(route, page)
+
         self.layouts[session.id] = layout
 
         await session.send_command(layout.update_layout_event)
@@ -186,19 +197,44 @@ class App:
 
     async def _on_event(self, event: EVENT) -> None:
         session = event._ctx.session
-        callbacks_map = self.layouts[session.id].get_callbacks_map()
+        callbacks_map = self.layouts[session.id].callbacks_map
 
         for event_cls, callback in callbacks_map:
             if event_cls == event._cls:
                 await callback(event)
 
-    async def run(self, page: RawPage = None) -> None:
-        self.default_page = page
+    async def switch_page(self, route: Route, *, session: Session):
+        if route not in self.raw_pages:
+            raise ValueError(f'Incorrect route: `{route}`')
+
+        layout = self.layouts[session.id]
+        layout.switch_page(route)
+
+        await session.send_command(layout.update_layout_event)
+
+    async def run(
+        self,
+        page: RawPage = None,
+        *,
+        routed_pages: dict[Route, RawPage] = None,
+    ) -> None:
+        assert page or routed_pages
+        if page is not None:
+            self.raw_pages = {'*': page}
+
+        elif routed_pages is not None:
+            self.raw_pages = routed_pages
+
         self.server = self.Server()
         await self.server.run()
 
-    def run_sync(self, page: Page = None) -> None:
+    def run_sync(
+        self,
+        page: RawPage = None,
+        *,
+        routed_pages: dict[Route, RawPage] = None,
+    ) -> None:
         try:
-            asyncio.run(self.run(page))
+            asyncio.run(self.run(page, routed_pages=routed_pages))
         except KeyboardInterrupt:
             pass
