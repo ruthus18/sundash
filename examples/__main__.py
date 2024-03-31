@@ -6,13 +6,17 @@ from sundash.logging import setup as setup_logging
 def run_example():
     setup_logging()
     if len(sys.argv) == 1:
-        from ._00_start import run
+        from ._00_hello import run
         run()
         return
 
     match sys.argv[1]:
-        case 'counter':
-            from ._01_counter import run
+        case 'hello':
+            from ._00_hello import run
+            run()
+
+        case 'buttons':
+            from ._01_buttons import run
             run()
 
         case 'clock':

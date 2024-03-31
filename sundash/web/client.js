@@ -97,8 +97,8 @@ function update_layout(data) {
 
 
 function set_var(data) {
-    app.__vars[data.key] = data.value
-    app.innerHTML = app.__html.replace(`{{ ${data.key} }}`, data.value)
+    app.__vars[data.name] = data.value
+    app.innerHTML = app.__html.replace(`{{ ${data.name} }}`, data.value)
     _init_buttons()
     _init_inputs()
     

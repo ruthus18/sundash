@@ -9,8 +9,12 @@ from .core import COMMAND
 from .core import EVENT
 from .core import HTML
 from .core import register_system_callback
+from .core import ON_SESSION_OPEN
+from .core import ON_SESSION_CLOSE
+from .core import ON_EVENT
 from .server import Server
 from .server import Session
+from .import utils
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,16 @@ class LAYOUT_UPDATED(EVENT): ...
 
 
 @dc.dataclass
+class SET_VAR(COMMAND):
+    name: str
+    value: str
+
+
+@dc.dataclass
+class VAR_SET(EVENT): ...
+
+
+@dc.dataclass
 class BUTTON_CLICK(EVENT):
     button_id: str
 
@@ -36,136 +50,155 @@ class INPUT_UPDATED(EVENT):
     value: str
 
 
-
 type Callback = t.Awaitable[t.Callable[[EVENT], None]]
-type CallbackRegistry = dict[EVENT.T, list[Callback]]
+type CallbacksMap = list[tuple[EVENT.T, Callback]]
 
-type LayoutTemplate = t.Iterable[type[Component] | HTML]
+type _CpName = str  # component name
+type _CbName = str  # callback name
+type _ComponentRegistry = dict[_CpName, list[tuple[EVENT.T, _CbName]]]
+
+_registry: _ComponentRegistry = defaultdict(list)
+
+
+def on(event_cls: EVENT.T) -> t.Callable:
+    def wrapper(callback: Callback) -> Callback:
+        self = utils.get_f_self(callback)
+        cmp_cls_name = utils.get_f_cls_name(callback)
+
+        if self is None and cmp_cls_name:
+            _registry[cmp_cls_name].append((event_cls, callback.__name__))
+        else:
+            raise RuntimeError
+
+        return callback
+    return wrapper
 
 
 class Component:
     html: HTML
 
+    @dc.dataclass
+    class Vars: pass
+
     def __init__(self):
-        self.callbacks: CallbackRegistry = {}
+        self.vars = self.Vars()
+
+    @property
+    def callbacks_map(self) -> CallbacksMap:
+        return [
+            (event_cls, getattr(self, callback_name))
+            for event_cls, callback_name
+            in _registry[self.__class__.__name__]
+        ]
+    
+    async def update_var(self, name: str, event: EVENT) -> None:
+        session = event._ctx.session
+        value = getattr(self.vars, name)
+
+        await session.send_command(SET_VAR(name=name, value=value))
 
 
 class HTMLComponent(Component):
-    def __init__(self, html: HTML): self.html = html
+    """Proxy component for plain HTML string"""
+    def __init__(self, html: HTML):
+        super().__init__()
+        self.html = html
+
+
+class Page(list[Component]):
+
+    @property
+    def callbacks_map(self) -> CallbacksMap:
+        cb_map = []
+        for component in self:
+            cb_map += component.callbacks_map
+        return cb_map
+
+
+type RawPage = t.Iterable[type[Component] | HTML]
+type Route = str
+
+
+def convert_to_page(raw_page: RawPage) -> Page:
+    page = Page()
+    for item in raw_page:
+        if isinstance(item, str):
+            component = HTMLComponent(html=item)
+        else:
+            component = item()
+
+        page.append(component)
+    return page
 
 
 class Layout:
+    DEFAULT_ROUTE = '*'
 
-    def __init__(self, template: LayoutTemplate = []):
-        self.template: LayoutTemplate = []
-        self.current: list[Component] = []
-        # self.storage: dict = {}
+    def __init__(self, raw_page: RawPage):
+        self.pages: dict[Route, Page] = {}
+        self.add_page(route=self.DEFAULT_ROUTE, page=raw_page)
 
-        for item in template:
-            if isinstance(item, str):
-                pass
-            elif issubclass(item, Component):
-                pass
-            else:
-                raise ValueError(
-                    f'Incorrect type of layout component: {item}'
-                )
-            self.template.append(item)
+    def add_page(self, route: Route, page: RawPage) -> None:
+        self.pages[route] = convert_to_page(page)
 
     @property
-    def as_html(self) -> HTML:
-        return ''.join((item.html for item in self.current))
+    def current_page(self) -> Page:
+        return self.pages[self.DEFAULT_ROUTE]
 
-    async def init_session(self, session: Session) -> None:
-        for item in self.template:
-            if isinstance(item, str):
-                component = HTMLComponent(html=item)
-            else:
-                component = item()
+    @property
+    def html(self) -> HTML:
+        return ''.join((item.html for item in self.current_page))
+    
+    @property
+    def vars(self) -> dict:
+        _v = {}
+        for item in self.current_page:
+            _v.update(item.vars.__dict__)
+        return _v
 
-            self.current.append(component)
-
-        cmd = UPDATE_LAYOUT(html=self.as_html)
-        await session.send_command(cmd)
-
-    def get_component_callbacks(self) -> t.Generator[CallbackRegistry]:
-        return (cmp.callbacks for cmp in self.current)
+    def get_callbacks_map(self) -> CallbacksMap:
+        return self.current_page.callbacks_map
+    
+    @property
+    def update_layout_event(self) -> UPDATE_LAYOUT:
+        return UPDATE_LAYOUT(html=self.html, vars=self.vars)
 
 
 class App:
     Server = Server
-    Layout = Layout
 
     def __init__(self):
-        self._layouts: dict[Session.ID, Layout] = {}
-        self._callbacks: dict[Session.ID, CallbackRegistry] = {}
+        self.raw_page: RawPage
+        self.layouts: dict[Session.ID, Layout] = {}
 
-        register_system_callback('on_session_open', self._on_session_open)
-        register_system_callback('on_session_close', self._on_session_close)
-        register_system_callback('on_event', self._on_event)
+        register_system_callback(ON_SESSION_OPEN, self._on_session_open)
+        register_system_callback(ON_SESSION_CLOSE, self._on_session_close)
+        register_system_callback(ON_EVENT, self._on_event)
 
     async def _on_session_open(self, session: Session) -> None:
-        layout = self.Layout(self.layout_tpl)
-        self._layouts[session.id] = layout
+        layout = Layout(self.default_page)
+        self.layouts[session.id] = layout
 
-        await layout.init_session(session)
-
-        # TODO: * impl merge op over registry
-        #       * run once instead every instance
-        callback_registry = defaultdict(list)
-
-        for callbacks in layout.get_component_callbacks():
-            for event_cls, callback in callbacks.items():
-                callback_registry[event_cls].append(callback)
-        
-        self._callbacks[session.id] = callback_registry
+        await session.send_command(layout.update_layout_event)
 
     async def _on_session_close(self, session: Session) -> None:
-        self._layouts.pop(session.id)
-        self._callbacks.pop(session.id)
+        self.layouts.pop(session.id)
 
     async def _on_event(self, event: EVENT) -> None:
         session = event._ctx.session
-        callbacks = self._callbacks[session.id][event._cls]
+        callbacks_map = self.layouts[session.id].get_callbacks_map()
 
-        for cb in callbacks:
-            await cb(event)
+        for event_cls, callback in callbacks_map:
+            if event_cls == event._cls:
+                await callback(event)
 
-    async def run(self, layout_tpl: LayoutTemplate = None) -> None:
-        self.layout_tpl = layout_tpl
-
+    async def run(self, page: RawPage = None) -> None:
+        self.default_page = page
         self.server = self.Server()
         await self.server.run()
 
-    def run_sync(self, layout_tpl: LayoutTemplate = None) -> None:
+    def run_sync(self, page: Page = None) -> None:
         try:
-            asyncio.run(self.run(layout_tpl))
+            asyncio.run(self.run(page))
         except KeyboardInterrupt:
             pass
-
-
-def on(event_cls: EVENT.T) -> t.Callable:
-    def wrapper(callback: Callback) -> Callback:
-        # self = _utils.get_f_self(func)
-        # cls_name = _utils.get_f_cls_name(func)
-
-        # if self is not None and cls_name:
-        #     # `on` called for `self.method` -> valid callback
-        #     subscribe(signal_cls, func)
-
-        # elif self is None and not cls_name:
-        #     # `on` called for module function -> valid callback
-        #     subscribe(signal_cls, func)
-
-        # elif self is None and cls_name:
-        #     # `on` called for class function -> not valid callback...
-        #     # only valid in component interface
-        #     from .layout import Component
-        #     Component.schedule_callback(signal_cls, cls_name, func.__name__)
-
-        # elif self is not None and not cls_name:
-        #     raise RuntimeError  # no way...
-
-        return callback
-
-    return wrapper

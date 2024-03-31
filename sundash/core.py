@@ -74,13 +74,19 @@ class COMMAND(_MESSAGE):
     type T = type[COMMAND]
 
 
-async def _dummy_callback(**kwargs): ...
+async def _dummy_session_callback(session: AbstractSession): ...
+async def _dummy_event_callback(event: EVENT): ...
+
+
+ON_SESSION_OPEN = 'on_session_open'
+ON_SESSION_CLOSE = 'on_session_close'
+ON_EVENT = 'on_event'
 
 
 _system_callbacks = {
-    'on_session_open': _dummy_callback,  # <- session
-    'on_session_close': _dummy_callback,  # <- session
-    'on_event': _dummy_callback,  # <- event
+    ON_SESSION_OPEN: _dummy_session_callback,
+    ON_SESSION_CLOSE: _dummy_session_callback,
+    ON_EVENT: _dummy_event_callback,
 }
 
 
@@ -93,13 +99,13 @@ async def run_system_callback(name: str, **kwargs):
 
 
 async def on_session(session: AbstractSession):
-    await run_system_callback('on_session_open', session=session)
+    await run_system_callback(ON_SESSION_OPEN, session=session)
     try:
         while True:
             event = await session.listen_event()
             event._ctx = MessageContext(session=session)
 
-            await run_system_callback('on_event', event=event)
+            await run_system_callback(ON_EVENT, event=event)
 
     except (SessionClosed, asyncio.CancelledError):
         pass
@@ -108,4 +114,4 @@ async def on_session(session: AbstractSession):
         logger.exception(e)
 
     finally:
-        await run_system_callback('on_session_close', session=session)
+        await run_system_callback(ON_SESSION_CLOSE, session=session)
