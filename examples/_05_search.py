@@ -3,10 +3,10 @@ from dataclasses import dataclass
 
 from sundash import App
 from sundash import Component
+from sundash import on
 from sundash.app import INPUT_UPDATED
 
 app = App()
-on = app.on
 
 
 class Search(Component):
@@ -28,17 +28,11 @@ class Search(Component):
         results: str = ''
 
     @on(INPUT_UPDATED)
-    async def show_results(self, sig: INPUT_UPDATED) -> None:
+    async def show_results(self, event: INPUT_UPDATED) -> None:
         n = random.randint(0, 10)
-        print(f'INPUT NAME: {sig.name}')
-        results = f'Found {n} results for "{sig.value}"'
+        self.vars.results = f'Found {n} results for "{event.value}"'
 
-        await self.set('results', results)
-
-
-def run():
-    app.run_sync(['<h1>🔎 Search</h1>', Search])
+        await self.update_var('results', event=event)
 
 
-if __name__ == '__main__':
-    run()
+app.run_sync(['<h1>🔎 Search</h1>', Search])

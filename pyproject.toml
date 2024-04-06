@@ -10,18 +10,18 @@ keywords = ["backend", "frontend", "server", "client", "ws", "framework"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-uvicorn = "^0.23.2"
+uvicorn = "^0.29.0"
 websockets = "^12.0"
-starlette = "^0.33.0"
+starlette = "^0.37.2"
 colorlog = "^6.8.2"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.21.0"
 ipdb = "^0.13.13"
-flake8 = "^6.1.0"
+flake8 = "^7.0.0"
 flake8-pyproject = "^1.2.3"
 isort = "^5.13.2"
-poethepoet = "^0.24.4"
+poethepoet = "^0.25.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -38,7 +38,7 @@ ignore = [
     "E402",  # module level import not at top of file
     "W504",  # line break after binary operator
 ]
-exclude = ["docs"]
+exclude = ["docs", "examples/__main__.py"]
 
 [tool.isort]
 multi_line_output = 3

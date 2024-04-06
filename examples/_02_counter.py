@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
-from sundash import on
 from sundash import App
 from sundash import Component
+from sundash import on
 from sundash.app import BUTTON_CLICK
+
+app = App()
 
 
 class Counter(Component):
@@ -26,9 +28,4 @@ class Counter(Component):
         await self.update_var('count', event=event)
 
 
-def run():
-    App().run_sync(['<h1>🧮 Counter</h1>', Counter])
-
-
-if __name__ == '__main__':
-    run()
+app.run_sync(['<h1>🧮 Counter</h1>', Counter])

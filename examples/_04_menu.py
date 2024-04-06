@@ -3,12 +3,11 @@ from sundash import Component
 from sundash import on
 from sundash.app import BUTTON_CLICK
 
-
 app = App()
 
 
 class CoinyMenu(Component):
-    html = f"""
+    html = '''
     <header>
         <h1>🪙 Coiny</h1>
         <div id="menu">
@@ -19,10 +18,10 @@ class CoinyMenu(Component):
             <button id="goals"><b>Goals</b></button>
         </div>
     </header>
-    """
+    '''
 
     @on(BUTTON_CLICK)
-    async def on_click(self, event: BUTTON_CLICK) -> None:
+    async def on_click(self, event: BUTTON_CLICK):
         session = event._ctx.session
         await app.switch_page(event.button_id, session=session)
 
@@ -30,15 +29,10 @@ class CoinyMenu(Component):
 coiny = lambda body: [CoinyMenu, body]
 
 
-def run():
-    app.run_sync(
-        routed_pages={
-            'main': coiny('<p>Main Page</p>'),
-            'trading': coiny('<p>Trading Page</p>'),
-            'goals': coiny('<p>Goals Page</p>'),
-        }
-    )
-
-
-if __name__ == '__main__':
-    run()
+app.run_sync(
+    routed_pages={
+        'main': coiny('<p>Main Page</p>'),
+        'trading': coiny('<p>Trading Page</p>'),
+        'goals': coiny('<p>Goals Page</p>'),
+    }
+)

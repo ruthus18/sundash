@@ -1,20 +1,21 @@
 from __future__ import annotations
+
 import asyncio
-from collections import defaultdict
 import dataclasses as dc
 import logging
 import typing as t
+from collections import defaultdict
 
+from . import utils
 from .core import COMMAND
 from .core import EVENT
 from .core import HTML
-from .core import register_system_callback
-from .core import ON_SESSION_OPEN
-from .core import ON_SESSION_CLOSE
 from .core import ON_EVENT
+from .core import ON_SESSION_CLOSE
+from .core import ON_SESSION_OPEN
+from .core import register_system_callback
 from .server import Server
 from .server import Session
-from .import utils
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ class Component:
             for event_cls, callback_name
             in _registry[self.__class__.__name__]
         ]
-    
+
     async def update_var(self, name: str, event: EVENT) -> None:
         session = event._ctx.session
         value = getattr(self.vars, name)
@@ -155,18 +156,18 @@ class Layout:
     @property
     def html(self) -> HTML:
         return ''.join((comp.html for comp in self.current_page))
-    
+
     @property
     def vars(self) -> dict:
-        _v = {}
+        result = {}
         for comp in self.current_page:
-            _v.update(comp.vars.__dict__)
-        return _v
+            result.update(comp.vars.__dict__)
+        return result
 
     @property
     def callbacks_map(self) -> CallbacksMap:
         return self.current_page.callbacks_map
-    
+
     @property
     def update_layout_event(self) -> UPDATE_LAYOUT:
         return UPDATE_LAYOUT(html=self.html, vars=self.vars)

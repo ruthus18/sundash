@@ -50,13 +50,13 @@ class Session(core.AbstractSession):
 
 
 class _ASGIServer(uvicorn.Server):
-    # replace default signal catch
-    # because I want to set OC signals handling elsewhere
+    # Shutdown default OS signals catch
+    # It should be implemented on another layer
     def install_signal_handlers(self) -> None: ...
 
 
-response_404 = HTMLResponse(content='<b>Not found</b>', status_code=404)
-response_405 = HTMLResponse(content='<b>Not allowed</b>', status_code=405)
+response_404 = HTMLResponse(content='<b>404</b> Not found', status_code=404)
+response_405 = HTMLResponse(content='<b>405</b> Not allowed', status_code=405)
 
 
 class Server:

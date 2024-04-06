@@ -5,35 +5,24 @@ from sundash.logging import setup as setup_logging
 
 def run_example():
     setup_logging()
-    if len(sys.argv) == 1:
-        from ._00_hello import run
-        run()
-        return
-
     match sys.argv[1]:
-        case 'hello':
-            from ._00_hello import run
-            run()
+        case '01' | 'hello':
+            from . import _01_hello
 
-        case 'buttons':
-            from ._01_buttons import run
-            run()
+        case '02' | 'counter':
+            from . import _02_counter
 
-        case 'clock':
-            from ._02_clock import run
-            run()
+        case '03' | 'clock':
+            from . import _03_clock
 
-        case 'coiny':
-            from ._03_coiny import run
-            run()
+        case '04' | 'menu':
+            from . import _04_menu
 
-        case 'search':
-            from ._04_search import run
-            run()
+        case '05' | 'search':
+            from . import _05_search
 
-        case 'tables':
-            from ._05_tables import run
-            run()
+        case '06' | 'tables':
+            from . import _06_tables
 
         case other:
             raise ValueError(f'unknown example: {other}')

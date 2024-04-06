@@ -16,48 +16,28 @@ Link to project on PyPi: https://pypi.org/project/sundash/
     pip install sundash
 ```
 
+
 ### Examples
 
-Check `examples` folder.
+```bash
+    python -m examples <num | name>
+```
 
-Run example (counter with buttons and user interaction):
+To run Hello World example:
 
 ```bash
-    python -m examples counter
+    python -m examples hello  # passing 01 also works
 ```
 
+Available examples:
 
-### Basic example
+* `01 hello` - show plain HTML string
+* `02 buttons` - counter with clickable buttons
+* `03 clock` - realtime clock (scheduler events)
+* `04 menu` - simple page routing
+* `05 search` - handling signle form input
+* `06 tables` - static tables
 
-```python
-    import datetime as dt
-
-    from sundash import EVERY_SECOND
-    from sundash import App
-    from sundash import Component
-    from sundash import on
-    
-
-    app = App()
-
-    now = lambda: dt.datetime.now().strftime('%H:%M:%S')
-
-
-    class Clock(Component):
-        html = '<p><b>Time: </b>{{ time }}<p/>'
-
-        class Vars:
-            # you can pass init values (static or procedural)
-            time: str = now
-
-        # run callback when user open webpage
-        @on(EVERY_SECOND)
-        async def update(self, _):
-            await self.set('time', now())  # live update of value
-
-    # add plain HTML or own components
-    app.run(layout=('<h1>🕰️ Clock</h1>', Clock))
-```
 
 ![clock](examples/img/_02_clock.png "Clock")
 

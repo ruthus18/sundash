@@ -35,10 +35,6 @@ log_config = {
             "handlers": ["stdout"],
             "level": logging.ERROR,
         },
-        "uvicorn.access": {
-            "handlers": ["null"],
-            "propagate": False,
-        },
     },
 }
 

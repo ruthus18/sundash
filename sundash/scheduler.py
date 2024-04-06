@@ -1,10 +1,10 @@
-import logging
 import asyncio
+import logging
 
+from . import App
 from .core import EVENT
 from .core import MessageContext
 from .server import Session
-
 
 logger = logging.getLogger(__name__)
 
@@ -45,3 +45,6 @@ class SchedulerMixin:
             await super().run(*args, **kwargs)
         finally:
             scheduler_task.cancel()
+
+
+class SchedulerApp(SchedulerMixin, App): ...

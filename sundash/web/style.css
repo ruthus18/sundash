@@ -88,6 +88,10 @@ th,td {
     border-bottom: 1px solid #928374;
 }
 
+tr:hover {
+    background-color: #282828;
+}
+
 
 #app {
     width: 1000px;

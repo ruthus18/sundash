@@ -1,18 +1,12 @@
-import datetime as dt
 import dataclasses as dc
+import datetime as dt
 
-from sundash import App as _App
 from sundash import Component
 from sundash import on
+from sundash.scheduler import EVERY_SECOND
+from sundash.scheduler import SchedulerApp
 
-
-from sundash.scheduler import SchedulerMixin, EVERY_SECOND
-
-
-class App(SchedulerMixin, _App): ...
-
-
-app = App()
+app = SchedulerApp()
 
 
 now = lambda: dt.datetime.now().strftime('%H:%M:%S')
@@ -31,9 +25,4 @@ class Clock(Component):
         await self.update_var('time', event=event)
 
 
-def run():
-    app.run_sync(['<h1>🕰️ Clock</h1>', Clock])
-
-
-if __name__ == '__main__':
-    run()
+app.run_sync(['<h1>🕰️ Clock</h1>', Clock])

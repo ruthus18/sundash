@@ -1,39 +1,42 @@
-import os
-
 from .app import Component
 from .core import HTML
 
-__all__ = ('Table', )
+type _DatasheetRow = tuple[str, ...]
 
-DIR = os.path.dirname(__file__)
+# first row using as data header
+type _Datasheet = tuple[_DatasheetRow, ...]
+
+
+TABLE = '<table>{}</table>'
+TH = '<th>{}</th>'
+TD = '<td>{}</td>'
+TR = '<tr>{}</tr>'
+
+
+def tr(items: list[HTML]) -> HTML:
+    return TR.format(''.join(items))
+
+
+def render_table(data: _Datasheet) -> HTML:
+    headers, *rows = data
+
+    html_headers = tr(TH.format(item) for item in headers)
+    html_items = ''
+    for row in rows:
+        html_items += tr(TD.format(item) for item in row)
+
+    return TABLE.format(html_headers + html_items)
+
+
+# Framework adapter
 
 
 class Table(Component):
-    type Data = tuple[tuple[str], ...]
-
-    init_data: Data = []
+    table_data: _Datasheet = None
 
     def __init__(self):
         super().__init__()
-        self.html = render_table(self.init_data)
+        if self.table_data is None:
+            raise ValueError('`table_data` param is missing')
 
-
-table = lambda c: f'<table>{c}</table>'
-th = lambda c: f'<th>{c}</th>'
-td = lambda c: f'<td>{c}</td>'
-
-tr = lambda cc: f'<tr>{''.join(c for c in cc)}</tr>'
-tr_th = lambda cc: tr(th(c) for c in cc)
-tr_td = lambda cc: tr(td(c) for c in cc)
-
-
-def render_table(data: Table.Data) -> HTML:
-    headers, items = data[0], data[1:]
-
-    html_headers = tr_th(name.capitalize() for name in headers)
-    html_items = ''
-
-    for item in items:
-        html_items += tr_td(value for value in item)
-
-    return table(html_headers + html_items)
+        self.html = render_table(self.table_data)
