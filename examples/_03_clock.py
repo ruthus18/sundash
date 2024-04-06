@@ -3,7 +3,7 @@ import datetime as dt
 
 from sundash import Component
 from sundash import on
-from sundash.scheduler import EVERY_SECOND
+from sundash.scheduler import EverySecond
 from sundash.scheduler import SchedulerApp
 
 app = SchedulerApp()
@@ -19,10 +19,10 @@ class Clock(Component):
     class Vars:
         time: str = dc.field(default_factory=now)
 
-    @on(EVERY_SECOND)
-    async def update(self, event: EVERY_SECOND):
+    @on(EverySecond)
+    async def update(self, _):
         self.vars.time = now()
-        await self.update_var('time', event=event)
+        await self.update_var('time')
 
 
 app.run_sync(['<h1>🕰️ Clock</h1>', Clock])

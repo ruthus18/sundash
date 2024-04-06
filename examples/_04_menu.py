@@ -1,7 +1,7 @@
 from sundash import App
 from sundash import Component
 from sundash import on
-from sundash.app import BUTTON_CLICK
+from sundash.app import ButtonClick
 
 app = App()
 
@@ -20,10 +20,9 @@ class CoinyMenu(Component):
     </header>
     '''
 
-    @on(BUTTON_CLICK)
-    async def on_click(self, event: BUTTON_CLICK):
-        session = event._ctx.session
-        await app.switch_page(event.button_id, session=session)
+    @on(ButtonClick)
+    async def on_click(self, event: ButtonClick):
+        await app.switch_page(event.button_id)
 
 
 coiny = lambda body: [CoinyMenu, body]

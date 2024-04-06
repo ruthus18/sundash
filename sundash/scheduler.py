@@ -2,14 +2,13 @@ import asyncio
 import logging
 
 from . import App
-from .core import EVENT
-from .core import MessageContext
+from .messages import Event
 from .server import Session
 
 logger = logging.getLogger(__name__)
 
 
-class EVERY_SECOND(EVENT): ...
+class EverySecond(Event): ...
 
 
 _scheduled_sessions: dict[Session.ID, Session] = {}
@@ -17,21 +16,21 @@ _scheduled_sessions: dict[Session.ID, Session] = {}
 
 class SchedulerMixin:
 
-    async def _on_session_open(self, session: Session) -> None:
-        await super()._on_session_open(session)
-        _scheduled_sessions[session.id] = session
+    async def on_session_open(self) -> None:
+        await super().on_session_open()
+        _scheduled_sessions[self.session.id] = self.session
 
-    async def _on_session_close(self, session: Session) -> None:
-        await super()._on_session_close(session)
-        _scheduled_sessions.pop(session.id)
+    async def on_session_close(self) -> None:
+        await super().on_session_close()
+        _scheduled_sessions.pop(self.session.id)
 
     async def scheduler(self):
+        event = EverySecond()
         try:
             while True:
                 for session in _scheduled_sessions.values():
-                    event = EVERY_SECOND()
-                    event._ctx = MessageContext(session=session)
-                    await self._on_event(event)
+                    with session:
+                        await self.on_event(event)
 
                 await asyncio.sleep(1)
         except asyncio.CancelledError:

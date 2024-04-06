@@ -7,13 +7,9 @@ import typing as t
 from collections import defaultdict
 
 from . import utils
-from .core import COMMAND
-from .core import EVENT
 from .core import HTML
-from .core import ON_EVENT
-from .core import ON_SESSION_CLOSE
-from .core import ON_SESSION_OPEN
-from .core import register_system_callback
+from .messages import Command
+from .messages import Event
 from .server import Server
 from .server import Session
 
@@ -21,47 +17,47 @@ logger = logging.getLogger(__name__)
 
 
 @dc.dataclass
-class UPDATE_LAYOUT(COMMAND):
+class UpdateLayout(Command):
     html: HTML
     vars: dict = dc.field(default_factory=dict)
 
 
 @dc.dataclass
-class LAYOUT_UPDATED(EVENT): ...
+class LayoutUpdated(Event): ...
 
 
 @dc.dataclass
-class SET_VAR(COMMAND):
+class SetVar(Command):
     name: str
     value: str
 
 
 @dc.dataclass
-class VAR_SET(EVENT): ...
+class VarSet(Event): ...
 
 
 @dc.dataclass
-class BUTTON_CLICK(EVENT):
+class ButtonClick(Event):
     button_id: str
 
 
 @dc.dataclass
-class INPUT_UPDATED(EVENT):
+class InputUpdated(Event):
     name: str
     value: str
 
 
-type Callback = t.Awaitable[t.Callable[[EVENT], None]]
-type CallbacksMap = list[tuple[EVENT.T, Callback]]
+type Callback = t.Callable[[Event], t.Awaitable[None]]
+type CallbacksMap = list[tuple[Event.T, Callback]]
 
 type _CpName = str  # component name
 type _CbName = str  # callback name
-type _ComponentRegistry = dict[_CpName, list[tuple[EVENT.T, _CbName]]]
+type _ComponentRegistry = dict[_CpName, list[tuple[Event.T, _CbName]]]
 
 _registry: _ComponentRegistry = defaultdict(list)
 
 
-def on(event_cls: EVENT.T) -> t.Callable:
+def on(event_cls: Event.T) -> t.Callable:
     def wrapper(callback: Callback) -> Callback:
         self = utils.get_f_self(callback)
         cmp_cls_name = utils.get_f_cls_name(callback)
@@ -92,11 +88,10 @@ class Component:
             in _registry[self.__class__.__name__]
         ]
 
-    async def update_var(self, name: str, event: EVENT) -> None:
-        session = event._ctx.session
+    async def update_var(self, name: str) -> None:
         value = getattr(self.vars, name)
 
-        await session.send_command(SET_VAR(name=name, value=value))
+        await Session.get().send_command(SetVar(name=name, value=value))
 
 
 class HTMLComponent(Component):
@@ -169,8 +164,8 @@ class Layout:
         return self.current_page.callbacks_map
 
     @property
-    def update_layout_event(self) -> UPDATE_LAYOUT:
-        return UPDATE_LAYOUT(html=self.html, vars=self.vars)
+    def update_command(self) -> UpdateLayout:
+        return UpdateLayout(html=self.html, vars=self.vars)
 
 
 class App:
@@ -180,38 +175,41 @@ class App:
         self.raw_pages: dict[Route, RawPage] = {}
         self.layouts: dict[Session.ID, Layout] = {}
 
-        register_system_callback(ON_SESSION_OPEN, self._on_session_open)
-        register_system_callback(ON_SESSION_CLOSE, self._on_session_close)
-        register_system_callback(ON_EVENT, self._on_event)
+    @property
+    def session(self) -> Session:
+        return Session.get()
 
-    async def _on_session_open(self, session: Session) -> None:
+    @property
+    def session_layout(self) -> Layout:
+        return self.layouts[self.session.id]
+
+    async def on_session_open(self) -> None:
         layout = Layout()
         for route, page in self.raw_pages.items():
             layout.add_page(route, page)
 
-        self.layouts[session.id] = layout
+        self.layouts[self.session.id] = layout
 
-        await session.send_command(layout.update_layout_event)
+        await self.session.send_command(layout.update_command)
 
-    async def _on_session_close(self, session: Session) -> None:
-        self.layouts.pop(session.id)
+    async def on_session_close(self) -> None:
+        self.layouts.pop(self.session.id)
 
-    async def _on_event(self, event: EVENT) -> None:
-        session = event._ctx.session
-        callbacks_map = self.layouts[session.id].callbacks_map
+    async def on_event(self, event: Event) -> None:
+        callbacks_map = self.session_layout.callbacks_map
 
         for event_cls, callback in callbacks_map:
             if event_cls == event._cls:
                 await callback(event)
 
-    async def switch_page(self, route: Route, *, session: Session):
+    async def switch_page(self, route: Route):
         if route not in self.raw_pages:
             raise ValueError(f'Incorrect route: `{route}`')
 
-        layout = self.layouts[session.id]
+        layout = self.session_layout
         layout.switch_page(route)
 
-        await session.send_command(layout.update_layout_event)
+        await self.session.send_command(layout.update_command)
 
     async def run(
         self,
@@ -226,7 +224,11 @@ class App:
         elif routed_pages is not None:
             self.raw_pages = routed_pages
 
-        self.server = self.Server()
+        self.server = self.Server(
+            on_session_open=self.on_session_open,
+            on_session_close=self.on_session_close,
+            on_event=self.on_event,
+        )
         await self.server.run()
 
     def run_sync(

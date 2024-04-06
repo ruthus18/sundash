@@ -13,17 +13,17 @@ socket.onmessage = event => {
         data = JSON.parse(data)
     }
 
-    if (name == 'CLEAR_LAYOUT') {
+    if (name == 'ClearLayout') {
         clear_layout()
     }
-    else if (name == 'UPDATE_LAYOUT') {
+    else if (name == 'UpdateLayout') {
         update_layout(data)
     }
-    else if (name == 'SET_VAR') {
+    else if (name == 'SetVar') {
         set_var(data)
     }
     else {
-        console.error(`dispatching error: ${event.data}`)
+        console.error(`[!!!] dispatching error: ${event.data}`)
     }
 }
 
@@ -51,7 +51,7 @@ const app = document.getElementById('app')
 
 function clear_layout() {
     app.innerHTML = ''
-    socket.send('LAYOUT_CLEAN {}')
+    socket.send('LayoutClean {}')
 }
 
 
@@ -59,7 +59,7 @@ function _init_buttons() {
     const buttons = [...document.getElementsByTagName('button')]
     buttons.forEach(button => {
         button.onclick = () => {
-            socket.send(`BUTTON_CLICK {"button_id": "${button.id}"}`)
+            socket.send(`ButtonClick {"button_id": "${button.id}"}`)
         }
     })
 }
@@ -70,7 +70,7 @@ function _init_inputs() {
     inputs.forEach(input => {
         console.log(input)
         input.onchange = (e) => {
-            socket.send(`INPUT_UPDATED {"name": "${input.name}", "value": "${input.value}"}`)
+            socket.send(`InputUpdated {"name": "${input.name}", "value": "${input.value}"}`)
             e.target.value = ''
         }
     })
@@ -92,7 +92,7 @@ function update_layout(data) {
     _init_buttons()
     _init_inputs()
     
-    socket.send('LAYOUT_UPDATED {}')
+    socket.send('LayoutUpdated {}')
 }
 
 
@@ -102,5 +102,5 @@ function set_var(data) {
     _init_buttons()
     _init_inputs()
     
-    socket.send('VAR_SET {}')
+    socket.send('VarSet {}')
 }
