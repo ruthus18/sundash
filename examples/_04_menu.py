@@ -8,16 +8,16 @@ app = App()
 
 class CoinyMenu(Component):
     html = '''
-    <header>
-        <h1>🪙 Coiny</h1>
-        <div id="menu">
-            <button id="main"><b>Main</b></button>
-            <b>|</b>
-            <button id="trading"><b>Trading</b></button>
-            <b>|</b>
-            <button id="goals"><b>Goals</b></button>
-        </div>
-    </header>
+        <header>
+            <h1>🪙 Coiny</h1>
+            <div id="menu">
+                <button id="main"><b>Main</b></button>
+                <b>|</b>
+                <button id="trading"><b>Trading</b></button>
+                <b>|</b>
+                <button id="goals"><b>Goals</b></button>
+            </div>
+        </header>
     '''
 
     @on(ButtonClick)

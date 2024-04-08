@@ -3,7 +3,7 @@ import logging
 
 from . import App
 from .messages import Event
-from .server import Session
+from .sessions import Session
 
 logger = logging.getLogger(__name__)
 

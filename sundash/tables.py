@@ -1,35 +1,24 @@
 from .app import Component
-from .core import HTML
+from .html import HTML
+from .html import table
+from .html import td
+from .html import th
+from .html import tr
 
 type _DatasheetRow = tuple[str, ...]
-
-# first row using as data header
-type _Datasheet = tuple[_DatasheetRow, ...]
-
-
-TABLE = '<table>{}</table>'
-TH = '<th>{}</th>'
-TD = '<td>{}</td>'
-TR = '<tr>{}</tr>'
-
-
-def tr(items: list[HTML]) -> HTML:
-    return TR.format(''.join(items))
+type _Datasheet = tuple[_DatasheetRow, ...]  # first row using as data header
 
 
 def render_table(data: _Datasheet) -> HTML:
     headers, *rows = data
 
-    html_headers = tr(TH.format(item) for item in headers)
-    html_items = ''
-    for row in rows:
-        html_items += tr(TD.format(item) for item in row)
+    html_headers = tr(th(item) for item in headers)
+    html_items = [tr(td(item) for item in row) for row in rows]
 
-    return TABLE.format(html_headers + html_items)
+    return table([html_headers, *html_items])
 
 
 # Framework adapter
-
 
 class Table(Component):
     table_data: _Datasheet = None

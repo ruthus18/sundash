@@ -9,9 +9,11 @@ app = App()
 
 
 class Counter(Component):
-    btn_minus = '<button id="minus">-</button>'
-    btn_plus = '<button id="plus">+</button>'
-    html = btn_minus + '<b>{{ count }}</b>' + btn_plus
+    html = '''
+        <button id="minus">-</button>
+        <b>{{ count }}</b>
+        <button id="plus">+</button>
+    '''
 
     @dataclass
     class Vars:

@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import typing as t
@@ -11,46 +10,13 @@ from starlette.types import Receive
 from starlette.types import Scope
 from starlette.types import Send
 from starlette.websockets import WebSocket
-from starlette.websockets import WebSocketDisconnect
 
-from . import core
 from .logging import log_config
-from .messages import Command
 from .messages import Event
+from .sessions import Session
+from .sessions import SessionClosed
 
 logger = logging.getLogger(__name__)
-
-
-class Session(core.AbstractSession):
-    __id = 0
-
-    @classmethod
-    def new_id(cls) -> int:
-        cls.__id += 1
-        return cls.__id
-
-    def __init__(self, socket: WebSocket):
-        self.id = str(self.__class__.new_id())
-        self.socket = socket
-
-    def _parse_event(self, message: str) -> Event:
-        name, data = message.split(" ", 1)
-        event_cls = Event.get_by_name(name)
-
-        return event_cls(**json.loads(data))
-
-    async def _listen_event(self) -> Event:
-        try:
-            message = await self.socket.receive_text()
-            return self._parse_event(message)
-
-        except WebSocketDisconnect:
-            raise core.SessionClosed
-
-    async def _send_command(self, cmd: Command):
-        cmd_name = cmd.__class__.__name__
-        cmd_params = json.dumps(cmd.__dict__)
-        await self.socket.send_text(f'{cmd_name} {cmd_params}')
 
 
 class _ASGIServer(uvicorn.Server):
@@ -172,7 +138,7 @@ class Server:
                     event = await session.listen_event()
                     await self.on_event(event=event)
 
-            except (core.SessionClosed, asyncio.CancelledError):
+            except (SessionClosed, asyncio.CancelledError):
                 pass
 
             except Exception as e:

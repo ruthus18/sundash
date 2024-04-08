@@ -7,11 +7,11 @@ import typing as t
 from collections import defaultdict
 
 from . import utils
-from .core import HTML
+from .html import HTML
 from .messages import Command
 from .messages import Event
 from .server import Server
-from .server import Session
+from .sessions import Session
 
 logger = logging.getLogger(__name__)
 
