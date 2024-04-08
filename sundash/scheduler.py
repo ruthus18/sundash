@@ -1,7 +1,8 @@
 import asyncio
 import logging
 
-from . import App
+from .app import App
+from .app import AppInterface
 from .messages import Event
 from .sessions import Session
 
@@ -14,7 +15,7 @@ class EverySecond(Event): ...
 _scheduled_sessions: dict[Session.ID, Session] = {}
 
 
-class SchedulerMixin:
+class SchedulerMixin(AppInterface):
 
     async def on_session_open(self) -> None:
         await super().on_session_open()
@@ -31,8 +32,8 @@ class SchedulerMixin:
                 for session in _scheduled_sessions.values():
                     with session:
                         await self.on_event(event)
-
                 await asyncio.sleep(1)
+
         except asyncio.CancelledError:
             pass
         except Exception as e:

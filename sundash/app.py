@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import asyncio
 import dataclasses as dc
 import logging
@@ -168,37 +169,46 @@ class Layout:
         return UpdateLayout(html=self.html, vars=self.vars)
 
 
-class App:
+class AppInterface(abc.ABC):
+    @abc.abstractmethod
+    async def on_session_open(self) -> None: ...
+
+    @abc.abstractmethod
+    async def on_session_close(self) -> None: ...
+
+    @abc.abstractmethod
+    async def on_event(self, event: Event) -> None: ...
+
+
+class App(AppInterface):
     Server = Server
 
     def __init__(self):
         self.raw_pages: dict[Route, RawPage] = {}
-        self.layouts: dict[Session.ID, Layout] = {}
+        self._layouts: dict[Session.ID, Layout] = {}
 
     @property
     def session(self) -> Session:
         return Session.get()
 
     @property
-    def session_layout(self) -> Layout:
-        return self.layouts[self.session.id]
+    def layout(self) -> Layout:
+        return self._layouts[self.session.id]
 
     async def on_session_open(self) -> None:
         layout = Layout()
         for route, page in self.raw_pages.items():
             layout.add_page(route, page)
 
-        self.layouts[self.session.id] = layout
+        self._layouts[self.session.id] = layout
 
         await self.session.send_command(layout.update_command)
 
     async def on_session_close(self) -> None:
-        self.layouts.pop(self.session.id)
+        self._layouts.pop(self.session.id)
 
     async def on_event(self, event: Event) -> None:
-        callbacks_map = self.session_layout.callbacks_map
-
-        for event_cls, callback in callbacks_map:
+        for event_cls, callback in self.layout.callbacks_map:
             if event_cls == event._cls:
                 await callback(event)
 
@@ -206,10 +216,8 @@ class App:
         if route not in self.raw_pages:
             raise ValueError(f'Incorrect route: `{route}`')
 
-        layout = self.session_layout
-        layout.switch_page(route)
-
-        await self.session.send_command(layout.update_command)
+        self.layout.switch_page(route)
+        await self.session.send_command(self.layout.update_command)
 
     async def run(
         self,
