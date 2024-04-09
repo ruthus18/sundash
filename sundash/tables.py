@@ -20,7 +20,7 @@ def render_table(data: _Datasheet) -> HTML:
 
 # Framework adapter
 
-class Table(Component):
+class TableComponent(Component):
     table_data: _Datasheet = None
 
     def __init__(self):

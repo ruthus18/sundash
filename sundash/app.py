@@ -6,6 +6,7 @@ import dataclasses as dc
 import logging
 import typing as t
 from collections import defaultdict
+from contextvars import ContextVar
 
 from . import utils
 from .html import HTML
@@ -91,7 +92,6 @@ class Component:
 
     async def update_var(self, name: str) -> None:
         value = getattr(self.vars, name)
-
         await Session.get().send_command(SetVar(name=name, value=value))
 
 
@@ -126,6 +126,9 @@ def convert_to_page(raw_page: RawPage) -> Page:
 
         page.append(component)
     return page
+
+
+_layout: ContextVar[Layout] = ContextVar('_app_layout')
 
 
 class Layout:
@@ -164,9 +167,10 @@ class Layout:
     def callbacks_map(self) -> CallbacksMap:
         return self.current_page.callbacks_map
 
-    @property
-    def update_command(self) -> UpdateLayout:
-        return UpdateLayout(html=self.html, vars=self.vars)
+    async def send_update(self) -> None:
+        session = Session.get()
+        command = UpdateLayout(html=self.html, vars=self.vars)
+        await session.send_command(command)
 
 
 class AppInterface(abc.ABC):
@@ -181,11 +185,8 @@ class AppInterface(abc.ABC):
 
 
 class App(AppInterface):
-    Server = Server
-
     def __init__(self):
         self.raw_pages: dict[Route, RawPage] = {}
-        self._layouts: dict[Session.ID, Layout] = {}
 
     @property
     def session(self) -> Session:
@@ -193,19 +194,22 @@ class App(AppInterface):
 
     @property
     def layout(self) -> Layout:
-        return self._layouts[self.session.id]
+        return _layout.get()
+
+    @layout.setter
+    def layout(self, value: Layout | None) -> None:
+        _layout.set(value)
 
     async def on_session_open(self) -> None:
         layout = Layout()
         for route, page in self.raw_pages.items():
             layout.add_page(route, page)
 
-        self._layouts[self.session.id] = layout
-
-        await self.session.send_command(layout.update_command)
+        self.layout = layout
+        await self.layout.send_update()
 
     async def on_session_close(self) -> None:
-        self._layouts.pop(self.session.id)
+        self.layout = None
 
     async def on_event(self, event: Event) -> None:
         for event_cls, callback in self.layout.callbacks_map:
@@ -217,7 +221,7 @@ class App(AppInterface):
             raise ValueError(f'Incorrect route: `{route}`')
 
         self.layout.switch_page(route)
-        await self.session.send_command(self.layout.update_command)
+        await self.layout.send_update()
 
     async def run(
         self,
@@ -232,7 +236,7 @@ class App(AppInterface):
         elif routed_pages is not None:
             self.raw_pages = routed_pages
 
-        self.server = self.Server(
+        self.server = Server(
             on_session_open=self.on_session_open,
             on_session_close=self.on_session_close,
             on_event=self.on_event,

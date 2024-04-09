@@ -1,10 +1,10 @@
 from sundash import App
-from sundash.tables import Table
+from sundash.tables import TableComponent
 
 app = App()
 
 
-class CompanyView(Table):
+class CompaniesTable(TableComponent):
     table_data = (
         # Headers
         ('company', 'contact', 'country', 'employees'),
@@ -14,4 +14,4 @@ class CompanyView(Table):
     )
 
 
-app.run_sync(['<h1>📋 Tables</h1>', CompanyView])
+app.run_sync(['<h1>📋 Tables</h1>', CompaniesTable])
