@@ -39,7 +39,77 @@ Available examples:
 * `06 tables` - static tables
 
 
-![clock](examples/img/_02_clock.png "Clock")
+**Client interaction example:**
+
+```python
+from dataclasses import dataclass
+
+from sundash import App
+from sundash import Component
+from sundash import on
+from sundash.app import ButtonClick
+
+app = App()
+
+
+class Counter(Component):
+    html = '''
+        <button id="minus">-</button>
+        <b>{{ count }}</b>
+        <button id="plus">+</button>
+    '''
+
+    @dataclass
+    class Vars:
+        count: int = 0
+
+    @on(ButtonClick)
+    async def on_click(self, event: ButtonClick):
+        if 'plus' == event.button_id:
+            self.vars.count += 1
+
+        elif 'minus' == event.button_id:
+            self.vars.count -= 1
+
+        await self.update_var('count')
+
+
+app.run_sync(['<h1>🧮 Counter</h1>', Counter])
+```
+
+
+**Server Interaction Example:**
+
+```python
+import dataclasses as dc
+import datetime as dt
+
+from sundash import Component
+from sundash import on
+from sundash.scheduler import EverySecond
+from sundash.scheduler import SchedulerApp
+
+app = SchedulerApp()
+
+
+now = lambda: dt.datetime.now().strftime('%H:%M:%S')
+
+
+class Clock(Component):
+    html = '<p><b>Time:</b> {{ time }}<p/>'
+
+    @dc.dataclass
+    class Vars:
+        time: str = dc.field(default_factory=now)
+
+    @on(EverySecond)
+    async def update(self, _):
+        self.vars.time = now()
+        await self.update_var('time')
+
+
+app.run_sync(['<h1>🕰️ Clock</h1>', Clock])
+```
 
 
 ### В чем идея?

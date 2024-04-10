@@ -3,7 +3,7 @@ import logging
 from contextvars import ContextVar
 
 from .app import App
-from .app import AppInterface
+from .app import AppMixinInterface
 from .messages import Event
 from .sessions import Session
 
@@ -16,7 +16,7 @@ class EverySecond(Event): ...
 _scheduler_task: ContextVar[asyncio.Task] = ContextVar('_scheduler_task')
 
 
-class SchedulerMixin(AppInterface):
+class SchedulerMixin(AppMixinInterface):
 
     async def on_session_open(self) -> None:
         await super().on_session_open()

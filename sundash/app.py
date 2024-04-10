@@ -173,7 +173,7 @@ class Layout:
         await session.send_command(command)
 
 
-class AppInterface(abc.ABC):
+class AppMixinInterface(abc.ABC):
     @abc.abstractmethod
     async def on_session_open(self) -> None: ...
 
@@ -184,7 +184,7 @@ class AppInterface(abc.ABC):
     async def on_event(self, event: Event) -> None: ...
 
 
-class App(AppInterface):
+class App(AppMixinInterface):
     def __init__(self):
         self.raw_pages: dict[Route, RawPage] = {}
 

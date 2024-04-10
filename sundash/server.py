@@ -14,9 +14,17 @@ from starlette.websockets import WebSocket
 from .logging import log_config
 from .messages import Event
 from .sessions import Session
+from .sessions import AbstractSession
 from .sessions import SessionClosed
 
 logger = logging.getLogger(__name__)
+
+type _ServerCallback[T] = t.Callable[[T], t.Awaitable[None]]
+
+EXIT_CODE = 1
+
+response_404 = HTMLResponse(content='<b>404</b> Not found', status_code=404)
+response_405 = HTMLResponse(content='<b>405</b> Not allowed', status_code=405)
 
 
 class _ASGIServer(uvicorn.Server):
@@ -25,19 +33,7 @@ class _ASGIServer(uvicorn.Server):
     def install_signal_handlers(self) -> None: ...
 
 
-response_404 = HTMLResponse(content='<b>404</b> Not found', status_code=404)
-response_405 = HTMLResponse(content='<b>405</b> Not allowed', status_code=405)
-
-
-type _ServerCallback[T] = t.Callable[[T], t.Awaitable[None]]
-
-
-async def _dummy_callback(): ...
-async def _dummy_event_callback(event: Event): ...
-
-
 class Server:
-    _EXIT_CODE = 1
     ALLOWED_STATIC_FILES = ('.html', 'css', '.js', '.map', '.ico')
 
     STATIC_DIR = os.path.dirname(__file__) + '/web'
@@ -46,18 +42,20 @@ class Server:
     def __init__(
         self,
         *,
+        on_session_open: _ServerCallback[None],
+        on_session_close: _ServerCallback[None],
+        on_event: _ServerCallback[Event],
         host: str = 'localhost',
         port: int = 5000,
-        on_session_open: _ServerCallback[None] = _dummy_callback,
-        on_session_close: _ServerCallback[None] = _dummy_callback,
-        on_event: _ServerCallback[Event] = _dummy_event_callback,
+        session_cls: type[AbstractSession] = Session,
     ):
         self.host, self.port = host, port
-        self._static_files = StaticFiles(directory=self.STATIC_DIR)
+        self.static_files = StaticFiles(directory=self.STATIC_DIR)
 
         self.on_session_open = on_session_open
         self.on_session_close = on_session_close
         self.on_event = on_event
+        self.session_cls = session_cls
 
     async def run(self) -> None:
         config = uvicorn.Config(
@@ -79,20 +77,20 @@ class Server:
         self, scope: Scope, receive: Receive, send: Send
     ) -> None:
         if scope['type'] == 'lifespan':
-            exit_code = await self._handle_lifespan(scope, receive, send)
+            exit_code = await self.handle_lifespan(scope, receive, send)
             if exit_code:
                 return
 
         elif scope['type'] == 'http':
-            await self._handle_http_request(scope, receive, send)
+            await self.handle_http_request(scope, receive, send)
 
         elif scope['type'] == 'websocket':
-            await self._handle_websocket_request(scope, receive, send)
+            await self.handle_websocket_request(scope, receive, send)
 
         else:
             await response_405(scope, receive, send)
 
-    async def _handle_lifespan(
+    async def handle_lifespan(
         self, scope: Scope, receive: Receive, send: Send
     ) -> int | None:
         message = await receive()
@@ -103,35 +101,35 @@ class Server:
 
         elif message['type'] == 'lifespan.shutdown':
             await send({'type': 'lifespan.shutdown.complete'})
-            return self._EXIT_CODE
+            return EXIT_CODE
 
         else:
             return None
 
-    async def _handle_http_request(
+    async def handle_http_request(
         self, scope: Scope, receive: Receive, send: Send
     ) -> None:
-        path = self._static_files.get_path(scope)
+        path = self.static_files.get_path(scope)
 
         if path == '.':
-            resp = await self._static_files.get_response(
+            resp = await self.static_files.get_response(
                 self.INDEX_HTML_PATH, scope
             )
             await resp(scope, receive, send)
 
         elif any([path.endswith(ext) for ext in self.ALLOWED_STATIC_FILES]):
-            await self._static_files(scope, receive, send)
+            await self.static_files(scope, receive, send)
 
         else:
             await response_404(scope, receive, send)
 
-    async def _handle_websocket_request(
+    async def handle_websocket_request(
         self, scope: Scope, receive: Receive, send: Send
     ) -> None:
         socket = WebSocket(scope=scope, receive=receive, send=send)
         await socket.accept()
 
-        with Session(socket) as session:
+        with self.session_cls(socket) as session:
             await self.on_session_open()
             try:
                 while True:

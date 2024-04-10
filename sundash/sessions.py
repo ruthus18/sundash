@@ -13,11 +13,10 @@ from .messages import Event
 
 logger = logging.getLogger(__name__)
 
+_session: ContextVar[AbstractSession] = ContextVar('_session')
+
 
 class SessionClosed(Exception): ...
-
-
-_session: ContextVar[AbstractSession] = ContextVar('session')
 
 
 class AbstractSession(abc.ABC):
@@ -44,18 +43,17 @@ class AbstractSession(abc.ABC):
     async def listen_event(self) -> Event:
         event = await self._listen_event()
 
-        logger.info(f'[{self.id}] E >> {event._name:>20}  {event._data}')
+        logger.info(f'[{self.id}] EVN >> {event._name:>20}  {event._data}')
         return event
 
     async def send_command(self, cmd: Command) -> None:
         await self._send_command(cmd)
 
         fmt_data = cmd._data
-        # TODO: Need to move to logging level
         if 'html' in fmt_data:
-            fmt_data['html'] = '...'
+            fmt_data['html'] = '...'  # TODO: Need to move to logging level
 
-        logger.info(f'[{self.id}] C << {cmd._name:>20}  {fmt_data}')
+        logger.info(f'[{self.id}] CMD << {cmd._name:>20}  {fmt_data}')
 
 
 class Session(AbstractSession):
